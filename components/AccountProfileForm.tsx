@@ -28,7 +28,7 @@ export function AccountProfileForm({ user }: { user: AccountUser }) {
         <input
           type="password"
           value={password}
-          placeholder="New password (optional, min 8 chars)"
+          placeholder="New password (optional)"
           onChange={(e) => setPassword(e.target.value)}
         />
         <button

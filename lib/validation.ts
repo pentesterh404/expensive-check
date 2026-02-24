@@ -2,7 +2,7 @@ import { z } from "zod";
 
 export const registerSchema = z.object({
   email: z.string().email(),
-  password: z.string().min(8),
+  password: z.string().min(1),
   displayName: z.string().min(1).max(80).optional()
 });
 
@@ -44,17 +44,17 @@ export const categorySchema = z.object({
 
 export const adminCreateUserSchema = z.object({
   email: z.string().email(),
-  password: z.string().min(8),
+  password: z.string().min(1),
   displayName: z.string().min(1).max(80).optional().nullable()
 });
 
 export const adminUpdateUserSchema = z.object({
   email: z.string().email().optional(),
-  password: z.string().min(8).optional(),
+  password: z.string().min(1).optional(),
   displayName: z.string().min(1).max(80).nullable().optional()
 });
 
 export const accountProfilePatchSchema = z.object({
   displayName: z.string().min(1).max(80).nullable().optional(),
-  password: z.string().min(8).optional()
+  password: z.string().min(1).optional()
 });

@@ -50,6 +50,18 @@ export function UserManagerPanel({
     );
   });
 
+  function readApiError(data: any, fallback: string) {
+    if (typeof data?.error === "string" && data.error !== "Invalid payload") return data.error;
+    const fieldErrors = data?.details?.fieldErrors;
+    if (fieldErrors && typeof fieldErrors === "object") {
+      const first = Object.entries(fieldErrors).find(
+        ([, value]) => Array.isArray(value) && value.length > 0
+      ) as [string, string[]] | undefined;
+      if (first) return `${first[0]}: ${first[1][0]}`;
+    }
+    return data?.error || fallback;
+  }
+
   function resetMessages() {
     setError(null);
     setDbDeleteResult(null);
@@ -61,6 +73,14 @@ export function UserManagerPanel({
 
   async function createUser() {
     resetMessages();
+    if (!createForm.email.trim()) {
+      setError("email: Required");
+      return;
+    }
+    if (createForm.password.length < 1) {
+      setError("password: Required");
+      return;
+    }
     startTransition(async () => {
       const res = await fetch("/api/admin/users", {
         method: "POST",
@@ -73,7 +93,7 @@ export function UserManagerPanel({
       });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) {
-        setError(data.error || "Failed to create user");
+        setError(readApiError(data, "Failed to create user"));
         return;
       }
       setCreateForm({ email: "", password: "", displayName: "" });
@@ -114,7 +134,7 @@ export function UserManagerPanel({
       });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) {
-        setError(data.error || "Failed to update user");
+        setError(readApiError(data, "Failed to update user"));
         return;
       }
       setShowEditForm(false);
@@ -191,7 +211,7 @@ export function UserManagerPanel({
             />
             <input
               type="password"
-              placeholder="Password (min 8 chars)"
+              placeholder="Password"
               value={createForm.password}
               onChange={(e) => setCreateForm((f) => ({ ...f, password: e.target.value }))}
             />
