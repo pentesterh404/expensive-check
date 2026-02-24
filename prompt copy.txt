@@ -1,0 +1,117 @@
+You are implementing a personal expense-tracking dashboard webapp.
+
+Source: Telegram bot messages delivered via webhook.
+
+Stack (Option A, single repo with Supabase):
+- Next.js App Router (TypeScript)
+- Prisma ORM (with PostgreSQL / Supabase)
+- Supabase (Postgres + Auth optional)
+- JWT Authentication OR Supabase Auth
+- Recharts for charts
+- Docker for app containerization
+
+Core requirements (follow SPEC.md strictly):
+
+1) Telegram ingestion
+- Implement POST /api/telegram/webhook/<SECRET>
+- Validate Telegram update structure (message / edited_message)
+- Idempotency: store telegram_messages with UNIQUE(chat_id, message_id)
+- Create/Upsert expenses linked to telegram_messages
+- Handle retries safely (no duplicates)
+
+2) Telegram linking flow
+- Web app endpoint POST /api/telegram/link (auth required) -> returns {code, expires_at}
+- Bot command: /link CODE
+- Bind telegram_user_id to app user_id in telegram_identities
+
+3) Parser
+- Parse amount with units: k, tr, đ, vnd, vnđ
+- Parse tags from #tag
+- Optional date parsing: YYYY-MM-DD or DD/MM
+- Derive description from remaining text
+- Compute parse_confidence and set status:
+  - UNPARSED if no amount
+  - CONFIRMED if confidence >= 0.8
+  - otherwise PENDING_REVIEW
+- Provide unit tests for parser
+
+4) Web features
+- Dashboard summary endpoint GET /api/dashboard/summary
+- Expenses CRUD:
+  - GET /api/expenses with filters (from/to/category/tag/wallet/status/q)
+  - PATCH /api/expenses/:id (ownership enforced)
+  - DELETE /api/expenses/:id (soft delete)
+- Categories CRUD
+- UI pages: /login, /dashboard, /expenses, /categories, /settings
+- Review queue filter for PENDING_REVIEW and UNPARSED
+
+5) Security
+- Enforce per-user authorization for all reads/writes
+- Never expose TELEGRAM_BOT_TOKEN to client
+- Validate inputs (e.g., zod)
+- Webhook secret validation
+- Optional Row Level Security (RLS) with Supabase
+
+Docker + Supabase requirements
+
+A) Supabase (Cloud or Self-hosted)
+- Use Supabase Postgres as main database
+- Use connection string for Prisma:
+  DATABASE_URL=postgresql://USER:PASSWORD@HOST:PORT/db
+- Enable Row Level Security (RLS) on main tables (optional but recommended)
+- Provide SQL policies for:
+  users
+  expenses
+  categories
+  telegram_identities
+
+B) Docker (App container)
+- Provide Dockerfile for Next.js production build
+- Provide docker-compose.yml for local dev including:
+  - service: app
+  - env vars for Supabase connection
+- App runs on port 3000
+
+C) Environment variables (.env.example)
+
+DATABASE_URL
+SUPABASE_URL
+SUPABASE_ANON_KEY
+SUPABASE_SERVICE_ROLE_KEY (server only)
+JWT_SECRET (if not using Supabase Auth)
+TELEGRAM_BOT_TOKEN
+TELEGRAM_WEBHOOK_SECRET
+NEXT_PUBLIC_BASE_URL
+
+D) Database & Migration
+- Prisma schema compatible with Supabase Postgres
+- Provide migrations via prisma migrate
+- Provide seed script for default categories
+
+E) Auth Strategy
+Option 1: Supabase Auth
+- Use supabase-js on frontend
+- Validate session in API routes
+- Map auth.users.id -> users.id
+
+Option 2: Custom JWT
+- Store users in users table
+- Use bcrypt + JWT
+
+Choose ONE and document clearly in README.
+
+Deliverables (must output in final code):
+
+- Prisma schema + migrations
+- Next.js route handlers under /app/api/*
+- Telegram webhook handler
+- Parser module + tests
+- UI pages/components
+- Supabase RLS policies (SQL)
+- Dockerfile + docker-compose.yml
+- .env.example
+- README with:
+  - Supabase setup steps
+  - Docker build/run steps
+  - Telegram webhook setup
+  - Migration + seed instructions
