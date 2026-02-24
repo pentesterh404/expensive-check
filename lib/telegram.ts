@@ -63,6 +63,7 @@ export async function ingestTelegramUpdate(update: TelegramUpdate) {
 
   const rawText = msg.text ?? "";
   const parsed = parseExpenseMessage(rawText);
+  const rawUpdatePayload = JSON.parse(JSON.stringify(update)) as object;
   const parsedPayload = {
     ...parsed,
     expenseDate: parsed.expenseDate ? parsed.expenseDate.toISOString() : null
@@ -83,7 +84,7 @@ export async function ingestTelegramUpdate(update: TelegramUpdate) {
     update: {
       userId: existingIdentity?.userId,
       telegramUserId: msg.from?.id ? BigInt(msg.from.id) : null,
-      rawUpdate: update,
+      rawUpdate: rawUpdatePayload,
       rawText,
       parsedPayload
     },
@@ -92,7 +93,7 @@ export async function ingestTelegramUpdate(update: TelegramUpdate) {
       chatId: BigInt(msg.chat.id),
       messageId: msg.message_id,
       telegramUserId: msg.from?.id ? BigInt(msg.from.id) : null,
-      rawUpdate: update,
+      rawUpdate: rawUpdatePayload,
       rawText,
       parsedPayload
     }

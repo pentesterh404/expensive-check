@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import type { Route } from "next";
 import { usePathname } from "next/navigation";
 
 const links = [
@@ -9,7 +10,7 @@ const links = [
   { href: "/categories", label: "Categories" },
   { href: "/settings", label: "Settings" },
   { href: "/user-manager", label: "User Manager" }
-];
+] as const satisfies ReadonlyArray<{ href: Route; label: string }>;
 
 export function AppNav({ isAdmin }: { isAdmin: boolean }) {
   const pathname = usePathname();
