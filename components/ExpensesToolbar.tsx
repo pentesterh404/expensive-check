@@ -31,12 +31,43 @@ export function ExpensesToolbar({ categories }: { categories: CategoryOption[] }
     router.push(`/expenses?${params.toString()}`);
   }
 
+  useEffect(() => {
+    const timer = window.setTimeout(() => {
+      apply({ q });
+    }, 350);
+    return () => window.clearTimeout(timer);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [q]);
+
   return (
     <div className="toolbar">
       <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search text..." />
-      <input type="date" value={from} onChange={(e) => setFrom(e.target.value)} />
-      <input type="date" value={to} onChange={(e) => setTo(e.target.value)} />
-      <select value={category} onChange={(e) => setCategory(e.target.value)}>
+      <input
+        type="date"
+        value={from}
+        onChange={(e) => {
+          const value = e.target.value;
+          setFrom(value);
+          apply({ from: value });
+        }}
+      />
+      <input
+        type="date"
+        value={to}
+        onChange={(e) => {
+          const value = e.target.value;
+          setTo(value);
+          apply({ to: value });
+        }}
+      />
+      <select
+        value={category}
+        onChange={(e) => {
+          const value = e.target.value;
+          setCategory(value);
+          apply({ category: value });
+        }}
+      >
         <option value="">All categories</option>
         {categories.map((c) => (
           <option key={c.slug} value={c.slug}>
@@ -44,33 +75,20 @@ export function ExpensesToolbar({ categories }: { categories: CategoryOption[] }
           </option>
         ))}
       </select>
-      <select value={status} onChange={(e) => setStatus(e.target.value)}>
+      <select
+        value={status}
+        onChange={(e) => {
+          const value = e.target.value;
+          setStatus(value);
+          apply({ status: value });
+        }}
+      >
         <option value="">All status</option>
         <option value="REVIEW_QUEUE">REVIEW_QUEUE</option>
         <option value="PENDING_REVIEW">PENDING_REVIEW</option>
         <option value="UNPARSED">UNPARSED</option>
         <option value="CONFIRMED">CONFIRMED</option>
       </select>
-      <button className="button" type="button" onClick={() => apply({ q, from, to, category, status })}>
-        Apply Filters
-      </button>
-      <button className="button secondary" type="button" onClick={() => apply({ status: "REVIEW_QUEUE" })}>
-        Review Queue
-      </button>
-      <button
-        className="button secondary"
-        type="button"
-        onClick={() => {
-          setQ("");
-          setFrom("");
-          setTo("");
-          setCategory("");
-          setStatus("");
-          router.push("/expenses");
-        }}
-      >
-        Reset
-      </button>
     </div>
   );
 }

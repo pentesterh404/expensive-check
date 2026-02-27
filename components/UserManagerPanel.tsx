@@ -18,8 +18,16 @@ export function UserManagerPanel({
   users: UserRow[];
   currentAdminId: string;
 }) {
+  type PendingAction =
+    | "create-user"
+    | "save-edit"
+    | "delete-users"
+    | "delete-selected-db"
+    | "delete-admin-db";
+
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
+  const [pendingAction, setPendingAction] = useState<PendingAction | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [searchQuery, setSearchQuery] = useState("");
@@ -81,24 +89,29 @@ export function UserManagerPanel({
       setError("password: Required");
       return;
     }
+    setPendingAction("create-user");
     startTransition(async () => {
-      const res = await fetch("/api/admin/users", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          email: createForm.email,
-          password: createForm.password,
-          displayName: createForm.displayName || null
-        })
-      });
-      const data = await res.json().catch(() => ({}));
-      if (!res.ok) {
-        setError(readApiError(data, "Failed to create user"));
-        return;
+      try {
+        const res = await fetch("/api/admin/users", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            email: createForm.email,
+            password: createForm.password,
+            displayName: createForm.displayName || null
+          })
+        });
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok) {
+          setError(readApiError(data, "Failed to create user"));
+          return;
+        }
+        setCreateForm({ email: "", password: "", displayName: "" });
+        setShowCreateForm(false);
+        router.refresh();
+      } finally {
+        setPendingAction(null);
       }
-      setCreateForm({ email: "", password: "", displayName: "" });
-      setShowCreateForm(false);
-      router.refresh();
     });
   }
 
@@ -120,73 +133,102 @@ export function UserManagerPanel({
   async function saveEdit() {
     if (!editForm.userId) return;
     resetMessages();
+    setPendingAction("save-edit");
     startTransition(async () => {
-      const payload: Record<string, unknown> = {
-        email: editForm.email,
-        displayName: editForm.displayName || null
-      };
-      if (editForm.password) payload.password = editForm.password;
+      try {
+        const payload: Record<string, unknown> = {
+          email: editForm.email,
+          displayName: editForm.displayName || null
+        };
+        if (editForm.password) payload.password = editForm.password;
 
-      const res = await fetch(`/api/admin/users/${editForm.userId}`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload)
-      });
-      const data = await res.json().catch(() => ({}));
-      if (!res.ok) {
-        setError(readApiError(data, "Failed to update user"));
-        return;
+        const res = await fetch(`/api/admin/users/${editForm.userId}`, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload)
+        });
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok) {
+          setError(readApiError(data, "Failed to update user"));
+          return;
+        }
+        setShowEditForm(false);
+        setEditForm({ userId: "", email: "", password: "", displayName: "" });
+        router.refresh();
+      } finally {
+        setPendingAction(null);
       }
-      setShowEditForm(false);
-      setEditForm({ userId: "", email: "", password: "", displayName: "" });
-      router.refresh();
     });
   }
 
-  function deleteUserDbByIds(ids: string[], label: string) {
+  function deleteUserDbByIds(ids: string[], label: string, action: Extract<PendingAction, "delete-selected-db" | "delete-admin-db">) {
     if (ids.length === 0) return;
     resetMessages();
+    setPendingAction(action);
     startTransition(async () => {
-      for (const userId of ids) {
-        await fetch("/api/deletedb", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ userId })
+      try {
+        for (const userId of ids) {
+          const res = await fetch("/api/deletedb", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ userId })
+          });
+          if (!res.ok) {
+            const data = await res.json().catch(() => ({}));
+            setError(readApiError(data, "Failed to delete DB data"));
+            return;
+          }
+        }
+        setDbDeleteResult({
+          target: label,
+          result: { processed_users: ids.length }
         });
+        setSelectedIds((prev) => prev.filter((id) => !ids.includes(id)));
+        router.refresh();
+      } finally {
+        setPendingAction(null);
       }
-      setDbDeleteResult({
-        target: label,
-        result: { processed_users: ids.length }
-      });
-      setSelectedIds((prev) => prev.filter((id) => !ids.includes(id)));
-      router.refresh();
     });
   }
 
   function deleteSelectedDb() {
     if (selectedIds.length === 0) return;
     if (!window.confirm(`Delete DB contents for ${selectedIds.length} selected user(s)?`)) return;
-    void deleteUserDbByIds(selectedIds, `${selectedIds.length} selected user(s)`);
+    void deleteUserDbByIds(
+      selectedIds,
+      `${selectedIds.length} selected user(s)`,
+      "delete-selected-db"
+    );
   }
 
   function deleteAdminDb() {
     const admin = users.find((u) => u.id === currentAdminId);
     if (!admin) return;
     if (!window.confirm(`Delete DB contents for admin account ${admin.email}?`)) return;
-    void deleteUserDbByIds([admin.id], admin.email);
+    void deleteUserDbByIds([admin.id], admin.email, "delete-admin-db");
   }
 
   function deleteSelectedUsers() {
     if (selectedIds.length === 0) return;
     if (!window.confirm(`Delete ${selectedIds.length} selected user account(s) and all related data?`)) return;
     resetMessages();
+    setPendingAction("delete-users");
     startTransition(async () => {
-      for (const userId of selectedIds) {
-        await fetch(`/api/admin/users/${userId}`, { method: "DELETE" });
+      try {
+        for (const userId of selectedIds) {
+          const res = await fetch(`/api/admin/users/${userId}`, { method: "DELETE" });
+          if (!res.ok) {
+            const data = await res.json().catch(() => ({}));
+            setError(readApiError(data, "Failed to delete selected users"));
+            return;
+          }
+        }
+        setSelectedIds([]);
+        setShowEditForm(false);
+        router.refresh();
+      } finally {
+        setPendingAction(null);
       }
-      setSelectedIds([]);
-      setShowEditForm(false);
-      router.refresh();
     });
   }
 
@@ -217,7 +259,7 @@ export function UserManagerPanel({
             />
             <div className="toolbar">
               <button className="button" type="button" disabled={isPending} onClick={createUser}>
-                {isPending ? "Processing..." : "Create User"}
+                {isPending && pendingAction === "create-user" ? "Creating..." : "Create User"}
               </button>
               <button
                 className="button secondary"
@@ -255,7 +297,7 @@ export function UserManagerPanel({
             />
             <div className="toolbar">
               <button className="button" type="button" disabled={isPending} onClick={saveEdit}>
-                {isPending ? "Saving..." : "Save"}
+                {isPending && pendingAction === "save-edit" ? "Saving..." : "Save"}
               </button>
               <button
                 className="button secondary"
@@ -284,7 +326,7 @@ export function UserManagerPanel({
 
       <section className="card">
         <h3 style={{ marginTop: 0 }}>User Accounts</h3>
-        <div className="card" style={{ padding: 10, marginBottom: 12 }}>
+        <div className="card user-actions-bar" style={{ padding: 10, marginBottom: 12 }}>
           <div className="toolbar" style={{ alignItems: "center" }}>
             <input
               value={searchQuery}
@@ -321,7 +363,7 @@ export function UserManagerPanel({
               style={{ background: "#b42318", borderColor: "#b42318", color: "#fff" }}
               onClick={deleteSelectedUsers}
             >
-              Delete User
+              {isPending && pendingAction === "delete-users" ? "Deleting User..." : "Delete User"}
             </button>
             <button
               className="button secondary"
@@ -330,7 +372,7 @@ export function UserManagerPanel({
               style={{ borderColor: "#d97706", color: "#b45309", background: "#fff7ed" }}
               onClick={deleteSelectedDb}
             >
-              Delete DB
+              {isPending && pendingAction === "delete-selected-db" ? "Deleting DB..." : "Delete DB"}
             </button>
             <button
               className="button secondary"
@@ -339,7 +381,9 @@ export function UserManagerPanel({
               style={{ borderColor: "#d97706", color: "#b45309", background: "#fff7ed" }}
               onClick={deleteAdminDb}
             >
-              Delete DB (Admin)
+              {isPending && pendingAction === "delete-admin-db"
+                ? "Deleting DB (Admin)..."
+                : "Delete DB (Admin)"}
             </button>
             <button
               className="button secondary"

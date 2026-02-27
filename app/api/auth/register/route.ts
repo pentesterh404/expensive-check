@@ -4,6 +4,7 @@ import { errorResponse, ok } from "@/lib/api/response";
 import { hashPassword } from "@/lib/auth/password";
 import { signAuthToken } from "@/lib/auth/jwt";
 import { registerSchema } from "@/lib/validation";
+import { DEFAULT_USER_CATEGORIES } from "@/lib/default-categories";
 
 export async function POST(req: Request) {
   const body = await req.json().catch(() => null);
@@ -13,13 +14,27 @@ export async function POST(req: Request) {
   const existing = await prisma.user.findUnique({ where: { email: parsed.data.email } });
   if (existing) return errorResponse(409, "Email already registered");
 
-  const user = await prisma.user.create({
-    data: {
-      email: parsed.data.email,
-      displayName: parsed.data.displayName,
-      passwordHash: await hashPassword(parsed.data.password)
-    },
-    select: { id: true, email: true, displayName: true }
+  const passwordHash = await hashPassword(parsed.data.password);
+  const user = await prisma.$transaction(async (tx) => {
+    const createdUser = await tx.user.create({
+      data: {
+        email: parsed.data.email,
+        displayName: parsed.data.displayName,
+        passwordHash
+      },
+      select: { id: true, email: true, displayName: true }
+    });
+
+    await tx.category.createMany({
+      data: DEFAULT_USER_CATEGORIES.map((category) => ({
+        userId: createdUser.id,
+        name: category.name,
+        slug: category.slug,
+        color: category.color
+      }))
+    });
+
+    return createdUser;
   });
 
   const token = await signAuthToken({ userId: user.id, email: user.email });

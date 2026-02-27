@@ -52,6 +52,7 @@ export function LoginForm() {
         <button
           type="button"
           className={`button ${mode === "login" ? "" : "secondary"}`}
+          disabled={loading}
           onClick={() => setMode("login")}
         >
           Login
@@ -59,6 +60,7 @@ export function LoginForm() {
         <button
           type="button"
           className={`button ${mode === "register" ? "" : "secondary"}`}
+          disabled={loading}
           onClick={() => setMode("register")}
         >
           Register
@@ -75,7 +77,7 @@ export function LoginForm() {
         <input type="email" name="email" placeholder="Email" required />
         <input type="password" name="password" placeholder="Password" required />
         <button className="button" disabled={loading}>
-          {loading ? "Processing..." : mode === "login" ? "Sign In" : "Create Account"}
+          {loading ? (mode === "login" ? "Signing in..." : "Creating account...") : mode === "login" ? "Sign In" : "Create Account"}
         </button>
       </form>
 

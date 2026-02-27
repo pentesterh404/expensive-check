@@ -1,5 +1,6 @@
 import { PrismaClient } from "@prisma/client";
 import bcrypt from "bcryptjs";
+import { DEFAULT_USER_CATEGORIES } from "../../lib/default-categories";
 
 const prisma = new PrismaClient();
 
@@ -33,14 +34,7 @@ async function main() {
     }
   });
 
-  const defaults = [
-    { name: "Food", slug: "food", color: "#d56f36" },
-    { name: "Cafe", slug: "cafe", color: "#8f5c2c" },
-    { name: "Transport", slug: "transport", color: "#225a43" },
-    { name: "Shopping", slug: "shopping", color: "#a83f2f" }
-  ];
-
-  for (const c of defaults) {
+  for (const c of DEFAULT_USER_CATEGORIES) {
     await prisma.category.upsert({
       where: { userId_slug: { userId: user.id, slug: c.slug } },
       update: { name: c.name, color: c.color },

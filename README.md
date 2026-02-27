@@ -23,6 +23,16 @@ Next.js App Router + Prisma + PostgreSQL (Supabase compatible) dashboard for per
 - Parser unit tests (Vitest)
 - Supabase optional RLS policy SQL
 
+## POC screenshots
+
+### Dashboard
+
+![Dashboard POC](imgpoc/dashboard.png)
+
+### Telegram Message Flow
+
+![Telegram Message POC](imgpoc/telegram%20mess.png)
+
 ## Project setup
 
 1. Install dependencies

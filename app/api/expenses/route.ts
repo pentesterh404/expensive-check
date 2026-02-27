@@ -47,7 +47,12 @@ export async function GET(req: Request) {
 
       const expenses = await prisma.expense.findMany({
         where,
-        include: { category: true },
+        include: {
+          category: true,
+          telegramMessage: {
+            select: { createdAt: true }
+          }
+        },
         orderBy: { expenseDate: "desc" },
         take: 200
       });
@@ -56,6 +61,7 @@ export async function GET(req: Request) {
         expenses.map((e) => ({
           id: e.id,
           expenseDate: e.expenseDate.toISOString(),
+          receivedAt: (e.telegramMessage?.createdAt ?? e.createdAt).toISOString(),
           amount: Number(e.amount),
           description: e.description,
           rawText: e.rawText,

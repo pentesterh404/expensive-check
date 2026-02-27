@@ -1,6 +1,7 @@
 import { prisma } from "@/lib/db";
 import { errorResponse, ok } from "@/lib/api/response";
 import { requireAdminUser } from "@/lib/auth/session";
+import { DEFAULT_USER_CATEGORIES } from "@/lib/default-categories";
 
 async function deleteUserData(targetUserId: string) {
   return prisma.$transaction(async (tx) => {
@@ -28,13 +29,23 @@ async function deleteUserData(targetUserId: string) {
       where: { userId: targetUserId }
     });
 
+    const restoredCategories = await tx.category.createMany({
+      data: DEFAULT_USER_CATEGORIES.map((category) => ({
+        userId: targetUserId,
+        name: category.name,
+        slug: category.slug,
+        color: category.color
+      }))
+    });
+
     return {
       expenses_deleted: deletedExpenses.count,
       audit_logs_deleted: deletedAuditLogs.count,
       telegram_messages_deleted: deletedMessages.count,
       telegram_link_codes_deleted: deletedLinks.count,
       telegram_identities_deleted: deletedIdentities.count,
-      categories_deleted: deletedCategories.count
+      categories_deleted: deletedCategories.count,
+      default_categories_restored: restoredCategories.count
     };
   });
 }

@@ -30,7 +30,15 @@ const COLOR_PRESETS = [
 export function CategoriesManager({ categories }: { categories: CategoryRow[] }) {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
+  const [pendingAction, setPendingAction] = useState<"create" | "edit" | null>(null);
   const [form, setForm] = useState({
+    name: "",
+    slug: "",
+    color: "",
+    icon: ""
+  });
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [editForm, setEditForm] = useState({
     name: "",
     slug: "",
     color: "",
@@ -40,6 +48,7 @@ export function CategoriesManager({ categories }: { categories: CategoryRow[] })
 
   function onCreate() {
     setError(null);
+    setPendingAction("create");
     startTransition(async () => {
       const res = await fetch("/api/categories", {
         method: "POST",
@@ -54,9 +63,49 @@ export function CategoriesManager({ categories }: { categories: CategoryRow[] })
       const data = await res.json().catch(() => ({}));
       if (!res.ok) {
         setError(data.error || "Create category failed");
+        setPendingAction(null);
         return;
       }
       setForm({ name: "", slug: "", color: "", icon: "" });
+      setPendingAction(null);
+      router.refresh();
+    });
+  }
+
+  function openEdit(category: CategoryRow) {
+    setError(null);
+    setEditingId(category.id);
+    setEditForm({
+      name: category.name,
+      slug: category.slug,
+      color: category.color ?? "",
+      icon: category.icon ?? ""
+    });
+  }
+
+  function saveEdit() {
+    if (!editingId) return;
+    setError(null);
+    setPendingAction("edit");
+    startTransition(async () => {
+      const res = await fetch(`/api/categories/${editingId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          name: editForm.name,
+          slug: editForm.slug,
+          color: editForm.color || null,
+          icon: editForm.icon || null
+        })
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        setError(data.error || "Update category failed");
+        setPendingAction(null);
+        return;
+      }
+      setEditingId(null);
+      setPendingAction(null);
       router.refresh();
     });
   }
@@ -139,7 +188,7 @@ export function CategoriesManager({ categories }: { categories: CategoryRow[] })
             onChange={(e) => setForm((f) => ({ ...f, icon: e.target.value }))}
           />
           <button className="button" type="button" disabled={isPending} onClick={onCreate}>
-            {isPending ? "Creating..." : "Create Category"}
+            {isPending && pendingAction === "create" ? "Creating..." : "Create Category"}
           </button>
           {error && <div style={{ color: "#b42318" }}>{error}</div>}
         </div>
@@ -147,6 +196,48 @@ export function CategoriesManager({ categories }: { categories: CategoryRow[] })
 
       <div className="card">
         <h3 style={{ marginTop: 0 }}>Existing Categories</h3>
+
+        {editingId ? (
+          <div className="card" style={{ marginBottom: 12 }}>
+            <h4 style={{ marginTop: 0 }}>Edit Category</h4>
+            <div className="toolbar" style={{ display: "grid" }}>
+              <input
+                placeholder="Name"
+                value={editForm.name}
+                onChange={(e) => setEditForm((f) => ({ ...f, name: e.target.value }))}
+              />
+              <input
+                placeholder="Slug"
+                value={editForm.slug}
+                onChange={(e) => setEditForm((f) => ({ ...f, slug: e.target.value }))}
+              />
+              <input
+                placeholder="Color"
+                value={editForm.color}
+                onChange={(e) => setEditForm((f) => ({ ...f, color: e.target.value }))}
+              />
+              <input
+                placeholder="Icon"
+                value={editForm.icon}
+                onChange={(e) => setEditForm((f) => ({ ...f, icon: e.target.value }))}
+              />
+              <div className="toolbar">
+                <button className="button" type="button" disabled={isPending} onClick={saveEdit}>
+                  {isPending && pendingAction === "edit" ? "Saving..." : "Save"}
+                </button>
+                <button
+                  className="button secondary"
+                  type="button"
+                  disabled={isPending}
+                  onClick={() => setEditingId(null)}
+                >
+                  Cancel
+                </button>
+              </div>
+            </div>
+          </div>
+        ) : null}
+
         <div className="table-wrap">
           <table>
             <thead>
@@ -170,10 +261,27 @@ export function CategoriesManager({ categories }: { categories: CategoryRow[] })
                   </td>
                   <td>{c.icon ?? "-"}</td>
                   <td>
-                    <DeleteCategoryButton categoryId={c.id} />
+                    <div className="toolbar" style={{ gap: 6 }}>
+                      <button
+                        className="button secondary"
+                        type="button"
+                        style={{ padding: "6px 10px" }}
+                        onClick={() => openEdit(c)}
+                      >
+                        Edit
+                      </button>
+                      <DeleteCategoryButton categoryId={c.id} />
+                    </div>
                   </td>
                 </tr>
               ))}
+              {categories.length === 0 && (
+                <tr>
+                  <td colSpan={5} className="muted">
+                    No categories found.
+                  </td>
+                </tr>
+              )}
             </tbody>
           </table>
         </div>

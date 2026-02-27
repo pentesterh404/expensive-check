@@ -2,6 +2,7 @@ import Link from "next/link";
 import { AppShell } from "@/components/AppShell";
 import { TelegramLinkPanel } from "@/components/TelegramLinkPanel";
 import { UserMenu } from "@/components/UserMenu";
+import { AdminDbTransferPanel } from "@/components/AdminDbTransferPanel";
 import { getSessionUser } from "@/lib/auth/session";
 import { isAdminEmail } from "@/lib/auth/roles";
 
@@ -71,6 +72,8 @@ export default async function SettingsPage() {
                   Open User Manager
                 </Link>
               </div>
+
+              <AdminDbTransferPanel />
 
               <div className="card" style={{ marginTop: 14 }}>
                 <div

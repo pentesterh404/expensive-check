@@ -4,6 +4,7 @@ import { requireAdminUser } from "@/lib/auth/session";
 import { isAdminEmail } from "@/lib/auth/roles";
 import { hashPassword } from "@/lib/auth/password";
 import { adminCreateUserSchema } from "@/lib/validation";
+import { DEFAULT_USER_CATEGORIES } from "@/lib/default-categories";
 
 export async function GET() {
   try {
@@ -51,13 +52,27 @@ export async function POST(req: Request) {
     const exists = await prisma.user.findUnique({ where: { email: parsed.data.email } });
     if (exists) return errorResponse(409, "Email already exists");
 
-    const user = await prisma.user.create({
-      data: {
-        email: parsed.data.email,
-        displayName: parsed.data.displayName ?? null,
-        passwordHash: await hashPassword(parsed.data.password)
-      },
-      select: { id: true, email: true, displayName: true, createdAt: true }
+    const passwordHash = await hashPassword(parsed.data.password);
+    const user = await prisma.$transaction(async (tx) => {
+      const createdUser = await tx.user.create({
+        data: {
+          email: parsed.data.email,
+          displayName: parsed.data.displayName ?? null,
+          passwordHash
+        },
+        select: { id: true, email: true, displayName: true, createdAt: true }
+      });
+
+      await tx.category.createMany({
+        data: DEFAULT_USER_CATEGORIES.map((category) => ({
+          userId: createdUser.id,
+          name: category.name,
+          slug: category.slug,
+          color: category.color
+        }))
+      });
+
+      return createdUser;
     });
 
     return ok(

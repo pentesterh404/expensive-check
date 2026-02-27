@@ -7,7 +7,7 @@ export async function POST() {
   try {
     return await withUser(async (user) => {
       const code = crypto.randomBytes(4).toString("hex").toUpperCase();
-      const expiresAt = new Date(Date.now() + 10 * 60 * 1000);
+      const expiresAt = new Date(Date.now() + 2 * 60 * 1000);
 
       await prisma.telegramLinkCode.create({
         data: {

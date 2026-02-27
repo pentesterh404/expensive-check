@@ -8,6 +8,7 @@ import { DeleteExpenseButton } from "@/components/DeleteExpenseButton";
 type ExpenseRow = {
   id: string;
   expenseDate: string;
+  receivedAt?: string;
   description: string;
   amount: number;
   category: string | null;
@@ -28,6 +29,17 @@ function formatCurrency(value: number) {
   }).format(value);
 }
 
+function formatTime(value?: string) {
+  if (!value) return "-";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "-";
+  return date.toLocaleTimeString("en-US", {
+    hour: "2-digit",
+    minute: "2-digit",
+    second: "2-digit"
+  });
+}
+
 export function ExpensesTable({
   rows,
   categories,
@@ -40,8 +52,10 @@ export function ExpensesTable({
   const router = useRouter();
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [editingId, setEditingId] = useState<string | null>(null);
+  const [savingId, setSavingId] = useState<string | null>(null);
   const [editStatus, setEditStatus] = useState<string>("PENDING_REVIEW");
   const [editCategorySlug, setEditCategorySlug] = useState<string>("");
+  const [bulkAction, setBulkAction] = useState<"confirm" | "delete" | null>(null);
   const [isPending, startTransition] = useTransition();
 
   const categoryIdBySlug = useMemo(
@@ -71,6 +85,7 @@ export function ExpensesTable({
   }
 
   async function saveEdit(expenseId: string) {
+    setSavingId(expenseId);
     const payload: Record<string, unknown> = {
       status: editStatus
     };
@@ -85,10 +100,12 @@ export function ExpensesTable({
     const data = await res.json().catch(() => ({}));
     if (!res.ok) {
       alert(data.error || "Failed to update expense");
+      setSavingId(null);
       return;
     }
 
     setEditingId(null);
+    setSavingId(null);
     router.refresh();
   }
 
@@ -100,58 +117,80 @@ export function ExpensesTable({
 
   function runBulkConfirm() {
     if (selectedIds.length === 0) return;
+    setBulkAction("confirm");
     startTransition(async () => {
-      for (const id of selectedIds) {
-        await fetch(`/api/expenses/${id}`, {
-          method: "PATCH",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ status: "CONFIRMED" })
-        });
+      try {
+        for (const id of selectedIds) {
+          await fetch(`/api/expenses/${id}`, {
+            method: "PATCH",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ status: "CONFIRMED" })
+          });
+        }
+        setSelectedIds([]);
+        router.refresh();
+      } finally {
+        setBulkAction(null);
       }
-      setSelectedIds([]);
-      router.refresh();
     });
   }
 
   function runBulkDelete() {
     if (selectedIds.length === 0) return;
     if (!window.confirm(`Delete ${selectedIds.length} selected expenses?`)) return;
+    setBulkAction("delete");
     startTransition(async () => {
-      for (const id of selectedIds) {
-        await fetch(`/api/expenses/${id}`, { method: "DELETE" });
+      try {
+        for (const id of selectedIds) {
+          await fetch(`/api/expenses/${id}`, { method: "DELETE" });
+        }
+        setSelectedIds([]);
+        router.refresh();
+      } finally {
+        setBulkAction(null);
       }
-      setSelectedIds([]);
-      router.refresh();
     });
   }
 
   return (
-    <div className="card">
+    <div className="card expense-table-card">
       {showBulkActions && (
-        <div className="toolbar" style={{ marginBottom: 12 }}>
-          <span className="badge">Review Queue Mode</span>
-          <span className="muted">{selectedIds.length} selected</span>
-          <button
-            type="button"
-            className="button"
-            disabled={isPending || selectedIds.length === 0}
-            onClick={runBulkConfirm}
-          >
-            {isPending ? "Working..." : "Bulk Confirm"}
-          </button>
-          <button
-            type="button"
-            className="button secondary"
-            disabled={isPending || selectedIds.length === 0}
-            onClick={runBulkDelete}
-          >
-            Bulk Delete
-          </button>
+        <div className="review-toolbar">
+          <div className="review-toolbar-left">
+            <span className="badge">Review Queue</span>
+            <span className="muted review-selected">{selectedIds.length} selected</span>
+          </div>
+          <div className="review-toolbar-actions">
+            <button
+              type="button"
+              className="button"
+              disabled={isPending || selectedIds.length === 0}
+              onClick={runBulkConfirm}
+            >
+              {isPending && bulkAction === "confirm" ? "Confirming..." : "Bulk Confirm"}
+            </button>
+            <button
+              type="button"
+              className="button secondary"
+              disabled={isPending || selectedIds.length === 0}
+              onClick={runBulkDelete}
+            >
+              {isPending && bulkAction === "delete" ? "Deleting..." : "Bulk Delete"}
+            </button>
+          </div>
         </div>
       )}
 
+      {rows.length === 0 ? (
+        <div className="expense-empty">
+          <strong>No expenses found.</strong>
+          <p className="muted" style={{ margin: "6px 0 0" }}>
+            Try changing filters or wait for new Telegram messages.
+          </p>
+        </div>
+      ) : (
       <div className="table-wrap">
-        <table>
+        <table className="expense-table">
           <thead>
             <tr>
               {showBulkActions && (
@@ -165,19 +204,21 @@ export function ExpensesTable({
                 </th>
               )}
               <th>Date</th>
+              <th>Time</th>
               <th>Description</th>
               <th>Category</th>
               <th>Tags</th>
               <th>Wallet</th>
               <th>Status</th>
-              <th>Confidence</th>
-              <th>Amount</th>
+              <th className="th-right">Confidence</th>
+              <th className="th-right">Amount</th>
               <th>Actions</th>
             </tr>
           </thead>
           <tbody>
             {rows.map((e) => {
               const isEditing = editingId === e.id;
+              const isSaving = savingId === e.id;
               return (
                 <tr key={e.id}>
                   {showBulkActions && (
@@ -191,6 +232,7 @@ export function ExpensesTable({
                     </td>
                   )}
                   <td>{e.expenseDate}</td>
+                  <td>{formatTime(e.receivedAt)}</td>
                   <td>{e.description}</td>
                   <td>
                     {isEditing ? (
@@ -221,26 +263,26 @@ export function ExpensesTable({
                       <StatusBadge status={e.status} />
                     )}
                   </td>
-                  <td>{Math.round(e.parseConfidence * 100)}%</td>
-                  <td>{formatCurrency(e.amount)}</td>
+                  <td className="td-right">{Math.round(e.parseConfidence * 100)}%</td>
+                  <td className="td-right">{formatCurrency(e.amount)}</td>
                   <td>
-                    <div className="toolbar" style={{ gap: 6 }}>
+                    <div className="row-actions">
                       {isEditing ? (
                         <>
                           <button
                             type="button"
-                            className="button"
-                            style={{ padding: "6px 10px" }}
+                            className="button row-action-btn"
+                            disabled={isSaving}
                             onClick={() => {
                               void saveEdit(e.id);
                             }}
                           >
-                            Save
+                            {isSaving ? "Saving..." : "Save"}
                           </button>
                           <button
                             type="button"
-                            className="button secondary"
-                            style={{ padding: "6px 10px" }}
+                            className="button secondary row-action-btn"
+                            disabled={isSaving}
                             onClick={() => setEditingId(null)}
                           >
                             Cancel
@@ -250,8 +292,7 @@ export function ExpensesTable({
                         <>
                           <button
                             type="button"
-                            className="button secondary"
-                            style={{ padding: "6px 10px" }}
+                            className="button secondary row-action-btn"
                             onClick={() => startEdit(e)}
                           >
                             Edit
@@ -264,16 +305,10 @@ export function ExpensesTable({
                 </tr>
               );
             })}
-            {rows.length === 0 && (
-              <tr>
-                <td colSpan={showBulkActions ? 10 : 9} className="muted">
-                  No expenses found.
-                </td>
-              </tr>
-            )}
           </tbody>
         </table>
       </div>
+      )}
     </div>
   );
 }

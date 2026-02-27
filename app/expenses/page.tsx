@@ -51,7 +51,12 @@ export default async function ExpensesPage({
   const dbExpenses = user
     ? await prisma.expense.findMany({
         where: { userId: user.id, ...baseWhere },
-        include: { category: true },
+        include: {
+          category: true,
+          telegramMessage: {
+            select: { createdAt: true }
+          }
+        },
         orderBy: { expenseDate: "desc" },
         take: 200
       })
@@ -69,6 +74,7 @@ export default async function ExpensesPage({
       ? dbExpenses.map((e) => ({
         id: e.id,
         expenseDate: e.expenseDate.toISOString().slice(0, 10),
+        receivedAt: (e.telegramMessage?.createdAt ?? e.createdAt).toISOString(),
         description: e.description ?? e.rawText ?? "",
         amount: Number(e.amount),
         category: e.category?.name ?? null,
