@@ -2,9 +2,11 @@
 
 import { useTransition } from "react";
 import { useRouter } from "next/navigation";
+import { useToast } from "@/components/ToastProvider";
 
 export function DeleteCategoryButton({ categoryId }: { categoryId: string }) {
   const router = useRouter();
+  const { showToast } = useToast();
   const [isPending, startTransition] = useTransition();
 
   return (
@@ -19,9 +21,10 @@ export function DeleteCategoryButton({ categoryId }: { categoryId: string }) {
           const res = await fetch(`/api/categories/${categoryId}`, { method: "DELETE" });
           const data = await res.json().catch(() => ({}));
           if (!res.ok) {
-            alert(data.error || "Delete failed");
+            showToast(data.error || "Delete failed", "error");
             return;
           }
+          showToast("Category deleted", "success");
           router.refresh();
         });
       }}

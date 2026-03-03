@@ -1,6 +1,8 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useEffect, useState, useTransition } from "react";
+import { ChevronLeftIcon, ChevronRightIcon } from "@heroicons/react/24/outline";
+import { useToast } from "@/components/ToastProvider";
 
 type AdminUserRow = {
   id: string;
@@ -16,10 +18,22 @@ export function DeleteDbPanel({
   users: AdminUserRow[];
   currentAdminId: string;
 }) {
+  const PAGE_SIZE = 20;
   const [isPending, startTransition] = useTransition();
   const [result, setResult] = useState<Record<string, number> | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [targetLabel, setTargetLabel] = useState<string | null>(null);
+  const [currentPage, setCurrentPage] = useState(1);
+  const { showToast } = useToast();
+  const totalPages = Math.max(1, Math.ceil(users.length / PAGE_SIZE));
+  const safePage = Math.min(currentPage, totalPages);
+  const pageStart = (safePage - 1) * PAGE_SIZE;
+  const pageEnd = pageStart + PAGE_SIZE;
+  const pagedUsers = users.slice(pageStart, pageEnd);
+
+  useEffect(() => {
+    setCurrentPage((prev) => Math.min(prev, totalPages));
+  }, [totalPages]);
 
   function deleteForUser(user: AdminUserRow) {
     if (!window.confirm(`Delete DB contents for ${user.email} (keep account)?`)) return;
@@ -33,10 +47,13 @@ export function DeleteDbPanel({
       });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) {
-        setError(data.error || "Failed");
+        const msg = data.error || "Failed";
+        setError(msg);
+        showToast(msg, "error");
         return;
       }
       setResult(data.result ?? null);
+      showToast(`Deleted DB data for ${user.email}`, "success");
     });
   }
 
@@ -59,7 +76,7 @@ export function DeleteDbPanel({
             </tr>
           </thead>
           <tbody>
-            {users.map((user) => (
+            {pagedUsers.map((user) => (
               <tr key={user.id}>
                 <td>{user.displayName ?? "-"}</td>
                 <td>{user.email}</td>
@@ -88,6 +105,49 @@ export function DeleteDbPanel({
           </tbody>
         </table>
       </div>
+      {users.length > 0 ? (
+        <div
+          className="toolbar"
+          style={{
+            marginTop: 12,
+            justifyContent: "space-between",
+            alignItems: "center",
+            padding: 8,
+            border: "1px solid #ded4c2",
+            borderRadius: 10,
+            background: "#f7f3ea"
+          }}
+        >
+          <span className="muted">
+            Showing {pageStart + 1}-{Math.min(users.length, pageEnd)} / {users.length}
+          </span>
+          {totalPages > 1 ? (
+            <div className="toolbar" style={{ gap: 8 }}>
+              <button
+                type="button"
+                className="button secondary"
+                disabled={safePage <= 1}
+                onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+                aria-label="Previous page"
+                style={{ minWidth: 38, padding: "6px 10px" }}
+              >
+                <ChevronLeftIcon aria-hidden="true" width={16} height={16} />
+              </button>
+              <span className="badge">{safePage}/{totalPages}</span>
+              <button
+                type="button"
+                className="button secondary"
+                disabled={safePage >= totalPages}
+                onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
+                aria-label="Next page"
+                style={{ minWidth: 38, padding: "6px 10px" }}
+              >
+                <ChevronRightIcon aria-hidden="true" width={16} height={16} />
+              </button>
+            </div>
+          ) : null}
+        </div>
+      ) : null}
       {error && <div style={{ color: "#b42318", marginTop: 8 }}>{error}</div>}
       {result && (
         <pre className="card" style={{ marginTop: 12, whiteSpace: "pre-wrap" }}>

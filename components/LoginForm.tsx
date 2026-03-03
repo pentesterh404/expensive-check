@@ -2,9 +2,11 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import { useToast } from "@/components/ToastProvider";
 
 export function LoginForm() {
   const router = useRouter();
+  const { showToast } = useToast();
   const [mode, setMode] = useState<"login" | "register">("login");
   const [message, setMessage] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
@@ -28,12 +30,15 @@ export function LoginForm() {
     const data = await res.json().catch(() => ({}));
 
     if (!res.ok) {
-      setMessage(data.error || "Request failed");
+      const msg = data.error || "Request failed";
+      setMessage(msg);
+      showToast(msg, "error");
       setLoading(false);
       return;
     }
 
     setMessage("Success. Redirecting to dashboard...");
+    showToast("Success. Redirecting to dashboard...", "success");
     router.push("/dashboard");
     router.refresh();
     setLoading(false);

@@ -100,7 +100,6 @@ model Expense {
   description       String?
   tags              String[]
   wallet            String?
-  parseConfidence   Float        @default(0)
   status            ExpenseStatus @default(PENDING_REVIEW)
   deletedAt         DateTime?
   createdAt         DateTime     @default(now())

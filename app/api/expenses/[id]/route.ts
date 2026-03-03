@@ -11,7 +11,8 @@ export async function PATCH(
     const { id } = await context.params;
     return await withUser(async (user) => {
       const existing = await prisma.expense.findFirst({
-        where: { id, userId: user.id }
+        where: { id, userId: user.id },
+        select: { id: true }
       });
       if (!existing) return errorResponse(404, "Expense not found");
 
@@ -53,7 +54,8 @@ export async function DELETE(
     const { id } = await context.params;
     return await withUser(async (user) => {
       const existing = await prisma.expense.findFirst({
-        where: { id, userId: user.id }
+        where: { id, userId: user.id },
+        select: { id: true }
       });
       if (!existing) return errorResponse(404, "Expense not found");
 

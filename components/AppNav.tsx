@@ -12,6 +12,11 @@ const links = [
   { href: "/user-manager", label: "User Manager" }
 ] as const satisfies ReadonlyArray<{ href: Route; label: string }>;
 
+const compareLink = { href: "/compare", label: "Compare Months" } as const satisfies {
+  href: Route;
+  label: string;
+};
+
 export function AppNav({ isAdmin }: { isAdmin: boolean }) {
   const pathname = usePathname();
   const visibleLinks = isAdmin ? links : links.filter((l) => l.href !== "/user-manager");
@@ -32,6 +37,12 @@ export function AppNav({ isAdmin }: { isAdmin: boolean }) {
             {link.label}
           </Link>
         ))}
+        <Link
+          href={compareLink.href}
+          className={pathname === compareLink.href ? "active" : undefined}
+        >
+          {compareLink.label}
+        </Link>
       </nav>
     </aside>
   );

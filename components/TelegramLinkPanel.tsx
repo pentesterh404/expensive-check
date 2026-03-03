@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { useToast } from "@/components/ToastProvider";
 
 export function TelegramLinkPanel() {
   const [linkCode, setLinkCode] = useState<string | null>(null);
@@ -8,6 +9,7 @@ export function TelegramLinkPanel() {
   const [error, setError] = useState<string | null>(null);
   const [isGenerating, setIsGenerating] = useState(false);
   const [copyState, setCopyState] = useState<"idle" | "copied" | "failed">("idle");
+  const { showToast } = useToast();
 
   async function generateLinkCode() {
     setIsGenerating(true);
@@ -17,11 +19,14 @@ export function TelegramLinkPanel() {
       const res = await fetch("/api/telegram/link", { method: "POST" });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) {
-        setError(data.error || "Failed to create link code");
+        const msg = data.error || "Failed to create link code";
+        setError(msg);
+        showToast(msg, "error");
         return;
       }
       setLinkCode(data.code);
       setExpiresAt(data.expires_at);
+      showToast("Link code generated", "success");
     } finally {
       setIsGenerating(false);
     }
@@ -32,9 +37,11 @@ export function TelegramLinkPanel() {
     try {
       await navigator.clipboard.writeText(`/link ${linkCode}`);
       setCopyState("copied");
+      showToast("Copied /link command", "success", 1500);
       setTimeout(() => setCopyState("idle"), 1500);
     } catch {
       setCopyState("failed");
+      showToast("Copy failed", "error", 1500);
       setTimeout(() => setCopyState("idle"), 1500);
     }
   }

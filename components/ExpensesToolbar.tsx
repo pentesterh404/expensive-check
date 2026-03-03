@@ -24,6 +24,7 @@ export function ExpensesToolbar({ categories }: { categories: CategoryOption[] }
 
   function apply(next: Record<string, string>) {
     const params = new URLSearchParams(searchParams.toString());
+    params.delete("page");
     for (const [key, value] of Object.entries(next)) {
       if (value) params.set(key, value);
       else params.delete(key);
@@ -41,7 +42,7 @@ export function ExpensesToolbar({ categories }: { categories: CategoryOption[] }
 
   return (
     <div className="toolbar">
-      <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search text..." />
+      <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search text or Bill ID..." />
       <input
         type="date"
         value={from}

@@ -17,8 +17,8 @@ const amountRegex = /(\d+[.,]?\d*)\s*(k|tr|m|đ|d|vnd|vnđ)?/i;
 const tagRegex = /#([a-zA-Z0-9_-]+)/g;
 const isoDateRegex = /\b(\d{4}-\d{2}-\d{2})\b/;
 const shortDateRegex = /\b(\d{1,2})\/(\d{1,2})\b/;
-const walletStripRegex = /\$(wallet|cash|bank|momo|zalopay|card)\b/gi;
-const walletDetectRegex = /\$(wallet|cash|bank|momo|zalopay|card)\b/i;
+const walletStripRegex = /\$([^\s#]+)/gi;
+const walletDetectRegex = /\$([^\s#]+)/i;
 
 function normalize(input: string) {
   return input
@@ -66,7 +66,7 @@ function stripParts(text: string): string {
 
 function detectWallet(text: string): string | null {
   const walletMatch = text.match(walletDetectRegex);
-  return walletMatch ? walletMatch[1].toLowerCase() : null;
+  return walletMatch ? walletMatch[1].toLowerCase() : "eBank";
 }
 
 function detectCategory(tags: string[], description: string): string | null {

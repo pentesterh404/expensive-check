@@ -129,7 +129,6 @@ export async function ingestTelegramUpdate(update: TelegramUpdate) {
       description,
       tags: parsed.tags,
       wallet: parsed.wallet,
-      parseConfidence: parsed.parseConfidence,
       status: finalStatus
     },
     create: {
@@ -142,7 +141,6 @@ export async function ingestTelegramUpdate(update: TelegramUpdate) {
       description,
       tags: parsed.tags,
       wallet: parsed.wallet,
-      parseConfidence: parsed.parseConfidence,
       status: finalStatus
     }
   });

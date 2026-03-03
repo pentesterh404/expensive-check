@@ -59,14 +59,7 @@ export default async function SettingsPage() {
           <TelegramLinkPanel />
           {isAdmin ? (
             <div className="card">
-              <h3 style={{ marginTop: 0 }}>Environment Variables</h3>
-              <ul style={{ margin: 0, paddingLeft: 18, lineHeight: 1.9 }}>
-                <li><code>DATABASE_URL</code> for Supabase/Postgres</li>
-                <li><code>JWT_SECRET</code> for custom auth</li>
-                <li><code>TELEGRAM_BOT_TOKEN</code> (server only)</li>
-                <li><code>TELEGRAM_WEBHOOK_SECRET</code> for webhook endpoint</li>
-                <li><code>NEXT_PUBLIC_BASE_URL</code> for webhook setup/base URL</li>
-              </ul>
+              <h3 style={{ marginTop: 0 }}>Admin Tools</h3>
               <div className="toolbar" style={{ marginTop: 12 }}>
                 <Link href="/user-manager" className="button secondary">
                   Open User Manager

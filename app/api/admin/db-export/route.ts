@@ -26,7 +26,25 @@ export async function GET() {
         prisma.telegramLinkCode.findMany(),
         prisma.telegramMessage.findMany(),
         prisma.category.findMany(),
-        prisma.expense.findMany(),
+        prisma.expense.findMany({
+          select: {
+            id: true,
+            userId: true,
+            telegramMessageId: true,
+            categoryId: true,
+            expenseDate: true,
+            amount: true,
+            currency: true,
+            rawText: true,
+            description: true,
+            tags: true,
+            wallet: true,
+            status: true,
+            deletedAt: true,
+            createdAt: true,
+            updatedAt: true
+          }
+        }),
         prisma.auditLog.findMany()
       ]);
 
@@ -64,4 +82,3 @@ export async function GET() {
     return errorResponse(500, "Failed to export DB");
   }
 }
-

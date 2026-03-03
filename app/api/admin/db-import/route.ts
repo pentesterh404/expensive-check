@@ -150,7 +150,6 @@ export async function POST(req: Request) {
             description: item.description ?? null,
             tags: Array.isArray(item.tags) ? item.tags.map((tag: unknown) => String(tag)) : [],
             wallet: item.wallet ?? null,
-            parseConfidence: Number(item.parseConfidence ?? 0),
             status: item.status,
             deletedAt: toDate(item.deletedAt) ?? null,
             createdAt: toDate(item.createdAt) ?? new Date(),
@@ -203,4 +202,3 @@ export async function POST(req: Request) {
     return errorResponse(500, "Failed to import DB");
   }
 }
-

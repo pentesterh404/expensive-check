@@ -64,8 +64,7 @@ export const demoExpenses = [
     category: "cafe",
     tags: ["coffee"],
     wallet: "cash",
-    status: "CONFIRMED",
-    parseConfidence: 0.9
+    status: "CONFIRMED"
   },
   {
     id: "e2",
@@ -75,8 +74,7 @@ export const demoExpenses = [
     category: "food",
     tags: ["food"],
     wallet: "momo",
-    status: "CONFIRMED",
-    parseConfidence: 0.88
+    status: "CONFIRMED"
   },
   {
     id: "e3",
@@ -86,8 +84,7 @@ export const demoExpenses = [
     category: "transport",
     tags: [],
     wallet: "card",
-    status: "PENDING_REVIEW",
-    parseConfidence: 0.7
+    status: "PENDING_REVIEW"
   },
   {
     id: "e4",
@@ -97,8 +94,7 @@ export const demoExpenses = [
     category: null,
     tags: [],
     wallet: null,
-    status: "UNPARSED",
-    parseConfidence: 0.2
+    status: "UNPARSED"
   }
 ] as const;
 

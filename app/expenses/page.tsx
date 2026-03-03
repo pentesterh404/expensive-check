@@ -12,11 +12,15 @@ export default async function ExpensesPage({
 }: {
   searchParams?: Promise<Record<string, string | string[] | undefined>>;
 }) {
+  type CategoryOption = { id: string; slug: string; name: string };
+  const PAGE_SIZE = 10;
   const sp = (await searchParams) ?? {};
   const q = typeof sp.q === "string" ? sp.q : "";
   const from = typeof sp.from === "string" ? sp.from : "";
   const to = typeof sp.to === "string" ? sp.to : "";
   const category = typeof sp.category === "string" ? sp.category : "";
+  const rawPage = typeof sp.page === "string" ? Number.parseInt(sp.page, 10) : 1;
+  const requestedPage = Number.isFinite(rawPage) && rawPage > 0 ? rawPage : 1;
   const user = await getSessionUser();
   const status = typeof sp.status === "string" ? sp.status : "";
   const showReviewQueueBulkActions = Boolean(user) && status === "REVIEW_QUEUE";
@@ -41,6 +45,7 @@ export default async function ExpensesPage({
     ...(q
       ? {
           OR: [
+            { id: { contains: q, mode: "insensitive" } },
             { description: { contains: q, mode: "insensitive" } },
             { rawText: { contains: q, mode: "insensitive" } }
           ]
@@ -48,30 +53,50 @@ export default async function ExpensesPage({
       : {})
   };
 
+  const [totalCount, categoryOptions]: [number, CategoryOption[]] = user
+    ? await Promise.all([
+        prisma.expense.count({
+          where: { userId: user.id, ...baseWhere }
+        }),
+        prisma.category.findMany({
+          where: { userId: user.id },
+          select: { id: true, slug: true, name: true },
+          orderBy: { name: "asc" }
+        })
+      ])
+    : [demoExpenses.length, []];
+  const totalPages = Math.max(1, Math.ceil(totalCount / PAGE_SIZE));
+  const currentPage = Math.min(requestedPage, totalPages);
+  const offset = (currentPage - 1) * PAGE_SIZE;
+
   const dbExpenses = user
     ? await prisma.expense.findMany({
         where: { userId: user.id, ...baseWhere },
-        include: {
-          category: true,
+        select: {
+          id: true,
+          expenseDate: true,
+          createdAt: true,
+          description: true,
+          rawText: true,
+          amount: true,
+          tags: true,
+          wallet: true,
+          status: true,
+          category: {
+            select: { name: true, slug: true }
+          },
           telegramMessage: {
             select: { createdAt: true }
           }
         },
         orderBy: { expenseDate: "desc" },
-        take: 200
-      })
-    : [];
-
-  const categoryOptions = user
-    ? await prisma.category.findMany({
-        where: { userId: user.id },
-        select: { id: true, slug: true, name: true },
-        orderBy: { name: "asc" }
+        skip: offset,
+        take: PAGE_SIZE
       })
     : [];
 
   const rows = user
-      ? dbExpenses.map((e) => ({
+    ? dbExpenses.map((e) => ({
         id: e.id,
         expenseDate: e.expenseDate.toISOString().slice(0, 10),
         receivedAt: (e.telegramMessage?.createdAt ?? e.createdAt).toISOString(),
@@ -81,10 +106,9 @@ export default async function ExpensesPage({
         categorySlug: e.category?.slug ?? null,
         tags: e.tags,
         wallet: e.wallet,
-        status: e.status,
-        parseConfidence: e.parseConfidence
+        status: e.status
       }))
-    : demoExpenses;
+    : demoExpenses.slice(offset, offset + PAGE_SIZE);
 
   return (
     <AppShell showTopbar={false}>
@@ -107,6 +131,10 @@ export default async function ExpensesPage({
           rows={rows as any}
           categories={categoryOptions}
           showBulkActions={showReviewQueueBulkActions}
+          currentPage={currentPage}
+          totalPages={totalPages}
+          totalCount={totalCount}
+          pageSize={PAGE_SIZE}
         />
       </div>
     </AppShell>

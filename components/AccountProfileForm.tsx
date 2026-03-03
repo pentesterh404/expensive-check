@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useTransition } from "react";
+import { useToast } from "@/components/ToastProvider";
 
 type AccountUser = {
   id: string;
@@ -14,6 +15,7 @@ export function AccountProfileForm({ user }: { user: AccountUser }) {
   const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
+  const { showToast } = useToast();
 
   return (
     <div className="card account-card">
@@ -70,11 +72,14 @@ export function AccountProfileForm({ user }: { user: AccountUser }) {
               });
               const data = await res.json().catch(() => ({}));
               if (!res.ok) {
-                setError(data.error || "Failed to update profile");
+                const msg = data.error || "Failed to update profile";
+                setError(msg);
+                showToast(msg, "error");
                 return;
               }
               setPassword("");
               setMessage("Profile updated.");
+              showToast("Profile updated.", "success");
             });
           }}
         >

@@ -1,13 +1,16 @@
 "use client";
 
 import { useRef, useState } from "react";
+import { useToast } from "@/components/ToastProvider";
 
 export function AdminDbTransferPanel() {
   const fileRef = useRef<HTMLInputElement | null>(null);
   const [isExporting, setIsExporting] = useState(false);
+  const [isExportingSql, setIsExportingSql] = useState(false);
   const [isImporting, setIsImporting] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const { showToast } = useToast();
 
   async function exportDb() {
     setIsExporting(true);
@@ -17,7 +20,9 @@ export function AdminDbTransferPanel() {
       const res = await fetch("/api/admin/db-export");
       if (!res.ok) {
         const data = await res.json().catch(() => ({}));
-        setError(data.error || "Failed to export DB");
+        const msg = data.error || "Failed to export DB";
+        setError(msg);
+        showToast(msg, "error");
         return;
       }
       const blob = await res.blob();
@@ -30,8 +35,38 @@ export function AdminDbTransferPanel() {
       a.remove();
       window.URL.revokeObjectURL(url);
       setMessage("Database exported successfully.");
+      showToast("Database exported successfully.", "success");
     } finally {
       setIsExporting(false);
+    }
+  }
+
+  async function exportPgDump() {
+    setIsExportingSql(true);
+    setError(null);
+    setMessage(null);
+    try {
+      const res = await fetch("/api/admin/db-export-pgdump");
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        const msg = data.error || "Failed to export SQL with pg_dump";
+        setError(msg);
+        showToast(msg, "error");
+        return;
+      }
+      const blob = await res.blob();
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `expense-tracker-pgdump-${new Date().toISOString().replace(/[:.]/g, "-")}.sql`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      window.URL.revokeObjectURL(url);
+      setMessage("SQL backup exported successfully.");
+      showToast("SQL backup exported successfully.", "success");
+    } finally {
+      setIsExportingSql(false);
     }
   }
 
@@ -39,6 +74,7 @@ export function AdminDbTransferPanel() {
     const file = fileRef.current?.files?.[0];
     if (!file) {
       setError("Please choose a backup file.");
+      showToast("Please choose a backup file.", "error");
       return;
     }
 
@@ -59,10 +95,13 @@ export function AdminDbTransferPanel() {
       });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) {
-        setError(data.error || "Failed to import DB");
+        const msg = data.error || "Failed to import DB";
+        setError(msg);
+        showToast(msg, "error");
         return;
       }
       setMessage("Database import completed.");
+      showToast("Database import completed.", "success");
       if (fileRef.current) fileRef.current.value = "";
     } finally {
       setIsImporting(false);
@@ -76,14 +115,40 @@ export function AdminDbTransferPanel() {
         Admin only. Export full database to JSON, or import a JSON backup to restore data.
       </p>
       <div className="toolbar">
-        <button className="button secondary" type="button" disabled={isExporting || isImporting} onClick={exportDb}>
+        <button
+          className="button secondary"
+          type="button"
+          disabled={isExporting || isExportingSql || isImporting}
+          onClick={exportDb}
+        >
           {isExporting ? "Exporting..." : "Export DB"}
         </button>
+        <button
+          className="button secondary"
+          type="button"
+          disabled={isExporting || isExportingSql || isImporting}
+          onClick={exportPgDump}
+        >
+          {isExportingSql ? "Exporting SQL..." : "Export SQL (pg_dump)"}
+        </button>
       </div>
+      <p className="muted" style={{ marginTop: 8, marginBottom: 0 }}>
+        `Export SQL (pg_dump)` requires `pg_dump` binary on the server runtime.
+      </p>
 
       <div className="toolbar" style={{ marginTop: 10, alignItems: "center" }}>
-        <input ref={fileRef} type="file" accept="application/json,.json" disabled={isImporting || isExporting} />
-        <button className="button" type="button" disabled={isImporting || isExporting} onClick={importDb}>
+        <input
+          ref={fileRef}
+          type="file"
+          accept="application/json,.json"
+          disabled={isImporting || isExporting || isExportingSql}
+        />
+        <button
+          className="button"
+          type="button"
+          disabled={isImporting || isExporting || isExportingSql}
+          onClick={importDb}
+        >
           {isImporting ? "Importing..." : "Import DB"}
         </button>
       </div>
@@ -93,4 +158,3 @@ export function AdminDbTransferPanel() {
     </div>
   );
 }
-

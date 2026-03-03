@@ -38,6 +38,7 @@ export async function GET(req: Request) {
         ...(q.q
           ? {
               OR: [
+                { id: { contains: q.q, mode: "insensitive" } },
                 { description: { contains: q.q, mode: "insensitive" } },
                 { rawText: { contains: q.q, mode: "insensitive" } }
               ]
@@ -47,8 +48,19 @@ export async function GET(req: Request) {
 
       const expenses = await prisma.expense.findMany({
         where,
-        include: {
-          category: true,
+        select: {
+          id: true,
+          expenseDate: true,
+          createdAt: true,
+          amount: true,
+          description: true,
+          rawText: true,
+          tags: true,
+          wallet: true,
+          status: true,
+          category: {
+            select: { id: true, name: true, slug: true }
+          },
           telegramMessage: {
             select: { createdAt: true }
           }
@@ -68,7 +80,6 @@ export async function GET(req: Request) {
           tags: e.tags,
           wallet: e.wallet,
           status: e.status,
-          parseConfidence: e.parseConfidence,
           category: e.category
             ? { id: e.category.id, name: e.category.name, slug: e.category.slug }
             : null
@@ -97,8 +108,7 @@ export async function POST(req: Request) {
           categoryId: parsed.data.categoryId ?? null,
           tags: parsed.data.tags ?? [],
           wallet: parsed.data.wallet ?? null,
-          status: parsed.data.status ?? "CONFIRMED",
-          parseConfidence: parsed.data.status ? 0.6 : 1
+          status: parsed.data.status ?? "CONFIRMED"
         }
       });
 
