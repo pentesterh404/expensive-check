@@ -35,6 +35,19 @@ function monthLabel(value: string) {
   });
 }
 
+function buildMonthOptionsFromStart(start: Date, end: Date) {
+  const startMonth = new Date(start.getFullYear(), start.getMonth(), 1);
+  const endMonth = new Date(end.getFullYear(), end.getMonth(), 1);
+  const options: { value: string; label: string }[] = [];
+  let cursor = new Date(endMonth);
+  while (cursor >= startMonth) {
+    const value = monthInputValue(cursor);
+    options.push({ value, label: monthLabel(value) });
+    cursor = new Date(cursor.getFullYear(), cursor.getMonth() - 1, 1);
+  }
+  return options;
+}
+
 function formatCurrency(value: number) {
   return new Intl.NumberFormat("en-US", {
     style: "currency",
@@ -53,8 +66,27 @@ export default async function ComparePage({
   const prev = new Date(now.getFullYear(), now.getMonth() - 1, 1);
   const user = await getSessionUser();
 
-  const leftMonth = parseMonthParam(typeof sp.left === "string" ? sp.left : undefined, prev);
-  const rightMonth = parseMonthParam(typeof sp.right === "string" ? sp.right : undefined, now);
+  const requestedLeftMonth = parseMonthParam(typeof sp.left === "string" ? sp.left : undefined, prev);
+  const requestedRightMonth = parseMonthParam(typeof sp.right === "string" ? sp.right : undefined, now);
+  const earliestExpense = user
+    ? await prisma.expense.findFirst({
+        where: {
+          userId: user.id,
+          deletedAt: null,
+          status: { not: "DELETED" }
+        },
+        orderBy: { expenseDate: "asc" },
+        select: { expenseDate: true }
+      })
+    : null;
+  const fallbackStart = new Date(now.getFullYear(), now.getMonth() - 11, 1);
+  const monthOptions = buildMonthOptionsFromStart(earliestExpense?.expenseDate ?? fallbackStart, now);
+  const optionValueSet = new Set(monthOptions.map((option) => option.value));
+  const rightMonth = optionValueSet.has(requestedRightMonth)
+    ? requestedRightMonth
+    : (monthOptions[0]?.value ?? monthInputValue(now));
+  const leftMonthDefault = monthOptions[1]?.value ?? monthOptions[0]?.value ?? monthInputValue(prev);
+  const leftMonth = optionValueSet.has(requestedLeftMonth) ? requestedLeftMonth : leftMonthDefault;
   const leftRange = monthRange(leftMonth);
   const rightRange = monthRange(rightMonth);
 
@@ -81,10 +113,13 @@ export default async function ComparePage({
 
   const leftKey = `${leftRange.start.getFullYear()}-${leftRange.start.getMonth()}`;
   const rightKey = `${rightRange.start.getFullYear()}-${rightRange.start.getMonth()}`;
+  const swapHref = `/compare?left=${encodeURIComponent(rightMonth)}&right=${encodeURIComponent(leftMonth)}`;
 
   const rowsMap = new Map<string, MonthCompareRow>();
   let leftTotal = 0;
   let rightTotal = 0;
+  let leftCount = 0;
+  let rightCount = 0;
 
   for (const item of expenses) {
     const monthKey = `${item.expenseDate.getFullYear()}-${item.expenseDate.getMonth()}`;
@@ -99,9 +134,11 @@ export default async function ComparePage({
     if (monthKey === leftKey) {
       current.leftTotal += amount;
       leftTotal += amount;
+      leftCount += 1;
     } else if (monthKey === rightKey) {
       current.rightTotal += amount;
       rightTotal += amount;
+      rightCount += 1;
     }
     rowsMap.set(categoryName, current);
   }
@@ -136,13 +173,30 @@ export default async function ComparePage({
           <form className="compare-form" method="GET">
             <label>
               Left Month
-              <input type="month" name="left" defaultValue={leftMonth} />
+              <select name="left" defaultValue={leftMonth}>
+                {monthOptions.map((option) => (
+                  <option key={option.value} value={option.value}>
+                    {option.label}
+                  </option>
+                ))}
+              </select>
             </label>
             <label>
               Right Month
-              <input type="month" name="right" defaultValue={rightMonth} />
+              <select name="right" defaultValue={rightMonth}>
+                {monthOptions.map((option) => (
+                  <option key={option.value} value={option.value}>
+                    {option.label}
+                  </option>
+                ))}
+              </select>
             </label>
-            <button type="submit" className="button">Apply</button>
+            <div className="compare-form-actions">
+              <a href={swapHref} className="button secondary" aria-label="Swap two months">
+                Swap
+              </a>
+              <button type="submit" className="button">Apply</button>
+            </div>
           </form>
         </section>
 
@@ -150,10 +204,12 @@ export default async function ComparePage({
           <div className="card metric-card">
             <div className="metric-label">{leftLabel}</div>
             <div className="metric-value">{formatCurrency(leftTotal)}</div>
+            <div className="muted">{leftCount} expense{leftCount === 1 ? "" : "s"}</div>
           </div>
           <div className="card metric-card">
             <div className="metric-label">{rightLabel}</div>
             <div className="metric-value">{formatCurrency(rightTotal)}</div>
+            <div className="muted">{rightCount} expense{rightCount === 1 ? "" : "s"}</div>
           </div>
           <div className="card metric-card metric-card-review">
             <div className="metric-label">Delta</div>
@@ -164,13 +220,20 @@ export default async function ComparePage({
           </div>
         </section>
 
-        <section className="card compare-chart-card">
+        <section className={`card compare-chart-card ${rows.length === 0 ? "compare-chart-card-empty" : ""}`}>
           <div className="chart-head">
             <h3>Category Comparison</h3>
             <span className="muted">Grouped vertical bars by category</span>
           </div>
           {rows.length === 0 ? (
-            <p className="muted">No expenses in selected months.</p>
+            <div className="compare-empty-state">
+              <p className="muted" style={{ margin: 0 }}>
+                No expenses found in selected months.
+              </p>
+              <p className="muted" style={{ margin: 0 }}>
+                Try another month range or add expenses in Telegram first.
+              </p>
+            </div>
           ) : (
             <CompareMonthsChart data={chartData} leftLabel={leftLabel} rightLabel={rightLabel} />
           )}

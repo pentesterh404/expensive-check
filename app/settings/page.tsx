@@ -3,12 +3,16 @@ import { AppShell } from "@/components/AppShell";
 import { TelegramLinkPanel } from "@/components/TelegramLinkPanel";
 import { UserMenu } from "@/components/UserMenu";
 import { AdminDbTransferPanel } from "@/components/AdminDbTransferPanel";
+import { AdminRuntimeConfigPanel } from "@/components/AdminRuntimeConfigPanel";
 import { getSessionUser } from "@/lib/auth/session";
 import { isAdminEmail } from "@/lib/auth/roles";
+import { getRuntimeConfig } from "@/lib/server/runtime-config";
 
 export default async function SettingsPage() {
   const user = await getSessionUser();
   const isAdmin = isAdminEmail(user?.email);
+  const runtimeConfig = getRuntimeConfig();
+  const telegramBotUsername = runtimeConfig.TELEGRAM_BOT_USERNAME || null;
   const envChecks = [
     {
       key: "DATABASE_URL",
@@ -22,8 +26,13 @@ export default async function SettingsPage() {
     },
     {
       key: "TELEGRAM_BOT_TOKEN",
-      present: Boolean(process.env.TELEGRAM_BOT_TOKEN),
+      present: Boolean(runtimeConfig.TELEGRAM_BOT_TOKEN),
       note: "Required for bot replies and Telegram API calls"
+    },
+    {
+      key: "TELEGRAM_BOT_USERNAME",
+      present: Boolean(runtimeConfig.TELEGRAM_BOT_USERNAME),
+      note: "Used to build direct Telegram link for /link command"
     },
     {
       key: "TELEGRAM_WEBHOOK_SECRET",
@@ -32,7 +41,7 @@ export default async function SettingsPage() {
     },
     {
       key: "NEXT_PUBLIC_BASE_URL",
-      present: Boolean(process.env.NEXT_PUBLIC_BASE_URL),
+      present: Boolean(runtimeConfig.NEXT_PUBLIC_BASE_URL),
       note: "Used for setup/docs and public app base URL"
     }
   ];
@@ -56,7 +65,7 @@ export default async function SettingsPage() {
         </section>
 
         <section className={`grid ${isAdmin ? "cols-2" : "cols-1"}`}>
-          <TelegramLinkPanel />
+          <TelegramLinkPanel botUsername={telegramBotUsername} isAdmin={isAdmin} />
           {isAdmin ? (
             <div className="card">
               <h3 style={{ marginTop: 0 }}>Admin Tools</h3>
@@ -67,6 +76,7 @@ export default async function SettingsPage() {
               </div>
 
               <AdminDbTransferPanel />
+              <AdminRuntimeConfigPanel />
 
               <div className="card" style={{ marginTop: 14 }}>
                 <div

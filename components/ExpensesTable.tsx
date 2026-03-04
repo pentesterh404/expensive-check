@@ -85,9 +85,13 @@ export function ExpensesTable({
   const [quickStatusValue, setQuickStatusValue] = useState<string>("PENDING_REVIEW");
   const [quickStatusSaving, setQuickStatusSaving] = useState(false);
   const [quickStatusAnchor, setQuickStatusAnchor] = useState<{ top: number; left: number } | null>(null);
+  const [quickDescriptionSaving, setQuickDescriptionSaving] = useState(false);
+  const [descriptionDialogExpenseId, setDescriptionDialogExpenseId] = useState<string | null>(null);
+  const [descriptionDialogValue, setDescriptionDialogValue] = useState("");
   const [isPending, startTransition] = useTransition();
   const activeExpense = rows.find((row) => row.id === activeExpenseId) ?? null;
-  const isAnyQuickSaving = quickCategorySaving || quickWalletSaving || quickStatusSaving;
+  const isAnyQuickSaving =
+    quickCategorySaving || quickWalletSaving || quickStatusSaving || quickDescriptionSaving;
   const { showToast } = useToast();
 
   const categoryIdBySlug = useMemo(
@@ -325,6 +329,39 @@ export function ExpensesTable({
     }
   }
 
+  function openQuickDescriptionDialog(row: ExpenseRow) {
+    if (isAnyQuickSaving) return;
+    setDescriptionDialogExpenseId(row.id);
+    setDescriptionDialogValue(row.description ?? "");
+  }
+
+  async function saveQuickDescription() {
+    if (!descriptionDialogExpenseId) return;
+    const normalized = descriptionDialogValue.trim();
+    setQuickDescriptionSaving(true);
+    showToast("Changing...", "info", 1200);
+    try {
+      const res = await fetch(`/api/expenses/${descriptionDialogExpenseId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ description: normalized || "-" })
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        showToast(data.error || "Quick change description failed", "error");
+        return;
+      }
+      showToast("Description updated", "success");
+      setDescriptionDialogExpenseId(null);
+      setDescriptionDialogValue("");
+      router.refresh();
+    } catch {
+      showToast("Quick change description failed", "error");
+    } finally {
+      setQuickDescriptionSaving(false);
+    }
+  }
+
   function exportExcel() {
     const headers = [
       "Date",
@@ -486,7 +523,14 @@ export function ExpensesTable({
                     </button>
                   </td>
                   <td>
-                    {e.description || "-"}
+                    <button
+                      type="button"
+                      className="text-link-btn"
+                      title="Quick change description"
+                      onClick={() => openQuickDescriptionDialog(e)}
+                    >
+                      {e.description || "-"}
+                    </button>
                   </td>
                   <td>
                     <button
@@ -785,6 +829,114 @@ export function ExpensesTable({
                   </button>
                 );
               })}
+            </div>
+          </section>
+        </div>
+      ) : null}
+
+      {descriptionDialogExpenseId ? (
+        <div
+          onClick={() => {
+            if (quickDescriptionSaving) return;
+            setDescriptionDialogExpenseId(null);
+            setDescriptionDialogValue("");
+          }}
+          style={{
+            position: "fixed",
+            inset: 0,
+            background: "rgba(18, 18, 24, 0.52)",
+            zIndex: 98,
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            padding: 16
+          }}
+        >
+          <section
+            className="card"
+            onClick={(event) => event.stopPropagation()}
+            style={{
+              width: "min(420px, 100%)",
+              background: "#f8f8fb",
+              color: "#1f2937",
+              borderColor: "#d9d9e3",
+              borderRadius: 16,
+              padding: 0,
+              overflow: "hidden",
+              boxShadow: "0 22px 48px rgba(17, 24, 39, 0.28)"
+            }}
+          >
+            <div style={{ padding: "24px 22px 8px", textAlign: "center" }}>
+              <div style={{ fontSize: 38, lineHeight: 1, marginBottom: 8 }}>✍️</div>
+              <div style={{ fontSize: 34, fontWeight: 500, marginBottom: 6 }}>Hi again!</div>
+              <div style={{ color: "#4b5563", fontSize: 14 }}>Update expense description</div>
+            </div>
+            <div style={{ padding: "10px 22px 20px" }}>
+              <button
+                type="button"
+                className="button secondary"
+                disabled={quickDescriptionSaving}
+                style={{ width: "100%", justifyContent: "flex-start", marginBottom: 10 }}
+                onClick={(event) => {
+                  event.preventDefault();
+                }}
+              >
+                <input
+                  autoFocus
+                  value={descriptionDialogValue}
+                  onChange={(event) => setDescriptionDialogValue(event.target.value)}
+                  placeholder="Description"
+                  style={{
+                    width: "100%",
+                    border: "0",
+                    outline: "none",
+                    background: "transparent",
+                    color: "#1f2937",
+                    padding: 0
+                  }}
+                  onKeyDown={(event) => {
+                    if (event.key === "Enter" && !quickDescriptionSaving) {
+                      event.preventDefault();
+                      void saveQuickDescription();
+                    }
+                  }}
+                />
+              </button>
+            </div>
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", borderTop: "1px solid #d9d9e3" }}>
+              <button
+                type="button"
+                disabled={quickDescriptionSaving}
+                onClick={() => void saveQuickDescription()}
+                style={{
+                  border: 0,
+                  background: "transparent",
+                  color: "#2563eb",
+                  fontWeight: 700,
+                  padding: "14px 12px",
+                  cursor: quickDescriptionSaving ? "default" : "pointer"
+                }}
+              >
+                {quickDescriptionSaving ? "Saving..." : "Ok"}
+              </button>
+              <button
+                type="button"
+                disabled={quickDescriptionSaving}
+                onClick={() => {
+                  setDescriptionDialogExpenseId(null);
+                  setDescriptionDialogValue("");
+                }}
+                style={{
+                  border: 0,
+                  borderLeft: "1px solid #d9d9e3",
+                  background: "transparent",
+                  color: "#2563eb",
+                  padding: "14px 12px",
+                  cursor: quickDescriptionSaving ? "default" : "pointer"
+                }}
+              >
+                Cancel
+              </button>
             </div>
           </section>
         </div>

@@ -4,6 +4,8 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+## [0.3.0] - 2026-03-04
+
 ### Added
 - Added global toast system and migrated mutation feedback from `alert/message` to toasts.
 - Added Heroicons and replaced custom/emoji icons (notification bell + paging arrows).
@@ -11,6 +13,16 @@ All notable changes to this project will be documented in this file.
 - Added `/compare` page for month-to-month comparison.
 - Added grouped vertical bar chart for category comparison in Compare Months.
 - Added Bill ID search support in Expenses filters.
+- Added Telegram link status API (`GET /api/telegram/link`) and status panel in Settings.
+- Added Telegram unlink API (`DELETE /api/telegram/link`) and `Unlink Telegram` action in Settings.
+- Added debug toggle support via `debug=true/false` query and `DEBUG=true/false` environment fallback.
+- Added admin-only Telegram token verification API/UI (`GET /api/admin/telegram/verify-token`).
+- Added admin-only runtime config API/UI to update:
+  - `NEXT_PUBLIC_BASE_URL`
+  - `TELEGRAM_BOT_USERNAME`
+  - `TELEGRAM_BOT_TOKEN`
+- Added direct Telegram action link (`Send To Telegram`) in Settings link flow.
+- Added custom React description-edit dialog in Expenses table (replacing browser prompt).
 
 ### Changed
 - Reduced Telegram link code validity window from 10 minutes to 2 minutes.
@@ -26,9 +38,18 @@ All notable changes to this project will be documented in this file.
 - Toast position moved to bottom-right.
 - Compare Months menu moved to the end of the sidebar menu.
 - UI responsiveness improvements for dashboard, expenses, pagination, and charts.
+- Improved Telegram webhook command parsing to support `/link CODE` and `/link@bot_username CODE`.
+- Expenses filtering changed to month dropdown with months that have data only.
+- Expenses search scope changed to Bill ID only (within selected month).
+- Compare Months dropdown now starts from first month that has data (with swap action).
+- User Details modal action layout updated: `Close` moved to bottom-right.
 
 ### Fixed
 - Fixed `db-export-pgdump` response typing issue for Next.js build.
+- Hardened Telegram ingest flow so unlinked chats cannot create expenses.
+- Improved Telegram bot reply reliability with clearer failure logging and retry behavior.
+- Telegram unlinked users now receive link guidance message with `{web}/settings`.
+- Parsing of tag-only expense inputs now avoids leaking category tag prefix into description.
 
 ## [0.2.0] - 2026-02-27
 
@@ -52,5 +73,6 @@ All notable changes to this project will be documented in this file.
 ### Fixed
 - Added safer async handling around user deletion and DB cleanup actions in `User Manager` to improve error reporting and avoid silent failures.
 
-[Unreleased]: https://github.com/<owner>/<repo>/compare/v0.2.0...HEAD
+[Unreleased]: https://github.com/<owner>/<repo>/compare/v0.3.0...HEAD
+[0.3.0]: https://github.com/<owner>/<repo>/releases/tag/v0.3.0
 [0.2.0]: https://github.com/<owner>/<repo>/releases/tag/v0.2.0

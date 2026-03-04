@@ -16,10 +16,25 @@ export async function GET(req: Request) {
       }
 
       const q = parsedQuery.data;
+      const monthRange = (() => {
+        if (!q.month) return null;
+        const [year, month] = q.month.split("-").map(Number);
+        if (!Number.isFinite(year) || !Number.isFinite(month)) return null;
+        const start = new Date(year, month - 1, 1);
+        const end = new Date(year, month, 1);
+        return { start, end };
+      })();
       const where: Prisma.ExpenseWhereInput = {
         userId: user.id,
         deletedAt: null,
-        ...(q.from || q.to
+        ...(monthRange
+          ? {
+              expenseDate: {
+                gte: monthRange.start,
+                lt: monthRange.end
+              }
+            }
+          : q.from || q.to
           ? {
               expenseDate: {
                 ...(q.from ? { gte: new Date(q.from) } : {}),
@@ -37,11 +52,7 @@ export async function GET(req: Request) {
             : {}),
         ...(q.q
           ? {
-              OR: [
-                { id: { contains: q.q, mode: "insensitive" } },
-                { description: { contains: q.q, mode: "insensitive" } },
-                { rawText: { contains: q.q, mode: "insensitive" } }
-              ]
+              id: { contains: q.q, mode: "insensitive" }
             }
           : {})
       };

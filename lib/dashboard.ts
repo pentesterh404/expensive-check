@@ -111,7 +111,7 @@ export async function buildDashboardSummary(userId: string): Promise<DashboardSu
     pendingCount,
     recentExpenses: recentExpenses.map((e) => ({
       id: e.id,
-      description: e.description ?? e.rawText ?? "No description",
+      description: e.description && e.description.trim().length > 0 ? e.description : "-",
       amount: Number(e.amount),
       date: e.expenseDate.toISOString(),
       category: e.category?.name ?? null,

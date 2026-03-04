@@ -573,6 +573,8 @@ export function UserManagerPanel({
               >
                 {isPending && pendingAction === "detail-delete-user" ? "Deleting User..." : "Delete User"}
               </button>
+            </div>
+            <div className="toolbar" style={{ marginTop: 8, justifyContent: "flex-end" }}>
               <button
                 className="button secondary"
                 type="button"

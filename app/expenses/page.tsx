@@ -13,26 +13,56 @@ export default async function ExpensesPage({
   searchParams?: Promise<Record<string, string | string[] | undefined>>;
 }) {
   type CategoryOption = { id: string; slug: string; name: string };
+  type MonthOption = { value: string; label: string };
   const PAGE_SIZE = 10;
   const sp = (await searchParams) ?? {};
   const q = typeof sp.q === "string" ? sp.q : "";
-  const from = typeof sp.from === "string" ? sp.from : "";
-  const to = typeof sp.to === "string" ? sp.to : "";
+  const month = typeof sp.month === "string" ? sp.month : "";
   const category = typeof sp.category === "string" ? sp.category : "";
   const rawPage = typeof sp.page === "string" ? Number.parseInt(sp.page, 10) : 1;
   const requestedPage = Number.isFinite(rawPage) && rawPage > 0 ? rawPage : 1;
   const user = await getSessionUser();
   const status = typeof sp.status === "string" ? sp.status : "";
   const showReviewQueueBulkActions = Boolean(user) && status === "REVIEW_QUEUE";
+  const monthRows = user
+    ? await prisma.$queryRaw<{ month_start: Date }[]>`
+        SELECT date_trunc('month', "expenseDate") AS month_start
+        FROM "Expense"
+        WHERE "userId" = ${user.id}
+          AND "deletedAt" IS NULL
+          AND status <> 'DELETED'
+        GROUP BY 1
+        ORDER BY 1 DESC
+      `
+    : [];
+  const monthOptions: MonthOption[] =
+    monthRows.length > 0
+      ? monthRows.map((row) => {
+          const date = new Date(row.month_start);
+          const value = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}`;
+          const label = date.toLocaleDateString("en-US", { month: "long", year: "numeric" });
+          return { value, label };
+        })
+      : [];
+  const selectedMonth = monthOptions.some((option) => option.value === month)
+    ? month
+    : (monthOptions[0]?.value ?? "");
+  const selectedMonthRange = (() => {
+    if (!selectedMonth) return null;
+    const [year, monthValue] = selectedMonth.split("-").map(Number);
+    const start = new Date(year, monthValue - 1, 1);
+    const end = new Date(year, monthValue, 1);
+    return { start, end };
+  })();
 
   const baseWhere: Prisma.ExpenseWhereInput = {
     deletedAt: null,
     status: { not: "DELETED" },
-    ...(from || to
+    ...(selectedMonthRange
       ? {
           expenseDate: {
-            ...(from ? { gte: new Date(`${from}T00:00:00`) } : {}),
-            ...(to ? { lte: new Date(`${to}T23:59:59`) } : {})
+            gte: selectedMonthRange.start,
+            lt: selectedMonthRange.end
           }
         }
       : {}),
@@ -44,11 +74,7 @@ export default async function ExpensesPage({
         : {}),
     ...(q
       ? {
-          OR: [
-            { id: { contains: q, mode: "insensitive" } },
-            { description: { contains: q, mode: "insensitive" } },
-            { rawText: { contains: q, mode: "insensitive" } }
-          ]
+          id: { contains: q, mode: "insensitive" }
         }
       : {})
   };
@@ -96,11 +122,11 @@ export default async function ExpensesPage({
     : [];
 
   const rows = user
-    ? dbExpenses.map((e) => ({
+      ? dbExpenses.map((e) => ({
         id: e.id,
         expenseDate: e.expenseDate.toISOString().slice(0, 10),
         receivedAt: (e.telegramMessage?.createdAt ?? e.createdAt).toISOString(),
-        description: e.description ?? e.rawText ?? "",
+        description: e.description ?? "",
         amount: Number(e.amount),
         category: e.category?.name ?? null,
         categorySlug: e.category?.slug ?? null,
@@ -124,7 +150,11 @@ export default async function ExpensesPage({
         </section>
 
         <section className="card">
-          <ExpensesToolbar categories={categoryOptions} />
+          <ExpensesToolbar
+            categories={categoryOptions}
+            monthOptions={monthOptions}
+            selectedMonth={selectedMonth}
+          />
         </section>
 
         <ExpensesTable

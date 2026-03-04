@@ -26,6 +26,7 @@ export const expensePatchSchema = expenseCreateSchema.partial().extend({
 });
 
 export const expenseQuerySchema = z.object({
+  month: z.string().regex(/^\d{4}-\d{2}$/).optional(),
   from: z.string().optional(),
   to: z.string().optional(),
   category: z.string().optional(),

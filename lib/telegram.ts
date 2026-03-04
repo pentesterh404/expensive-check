@@ -1,5 +1,6 @@
 import { prisma } from "@/lib/db";
 import { parseExpenseMessage } from "@/lib/parser/expense-parser";
+import { getRuntimeConfig } from "@/lib/server/runtime-config";
 
 interface TelegramMessageLike {
   message_id: number;
@@ -13,6 +14,14 @@ interface TelegramUpdate {
   update_id?: number;
   message?: TelegramMessageLike;
   edited_message?: TelegramMessageLike;
+}
+
+function stripLeadingTags(text: string) {
+  return text.replace(/^(?:\s*#[a-zA-Z0-9_-]+\s*)+/, "").trim();
+}
+
+function isAmountOnlyText(text: string) {
+  return /^\d+(?:[.,]\d+)?\s*(k|tr|m|đ|d|vnd|vnđ)?$/i.test(text.trim());
 }
 
 function formatAmountCompactVnd(amount: number) {
@@ -29,26 +38,36 @@ function formatAmountCompactVnd(amount: number) {
 }
 
 export async function sendTelegramBotMessage(chatId: number, text: string) {
-  const token = process.env.TELEGRAM_BOT_TOKEN;
+  const token = getRuntimeConfig().TELEGRAM_BOT_TOKEN?.trim();
   if (!token) return { sent: false, reason: "Missing TELEGRAM_BOT_TOKEN" } as const;
 
-  try {
-    const res = await fetch(`https://api.telegram.org/bot${token}/sendMessage`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        chat_id: chatId,
-        text
-      })
-    });
-    if (!res.ok) {
+  for (let attempt = 1; attempt <= 2; attempt += 1) {
+    try {
+      const res = await fetch(`https://api.telegram.org/bot${token}/sendMessage`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          chat_id: chatId,
+          text: text.trim().slice(0, 4096)
+        })
+      });
+      if (res.ok) {
+        return { sent: true } as const;
+      }
       const body = await res.text().catch(() => "");
-      return { sent: false, reason: `Telegram API ${res.status}: ${body}` } as const;
+      if (attempt === 2) {
+        return { sent: false, reason: `Telegram API ${res.status}: ${body}` } as const;
+      }
+    } catch (error) {
+      if (attempt === 2) {
+        return {
+          sent: false,
+          reason: error instanceof Error ? error.message : "Unknown error"
+        } as const;
+      }
     }
-    return { sent: true } as const;
-  } catch (error) {
-    return { sent: false, reason: error instanceof Error ? error.message : "Unknown error" } as const;
   }
+  return { sent: false, reason: "Unknown Telegram send failure" } as const;
 }
 
 export function extractTelegramMessage(update: TelegramUpdate): TelegramMessageLike | null {
@@ -68,11 +87,17 @@ export async function ingestTelegramUpdate(update: TelegramUpdate) {
     ...parsed,
     expenseDate: parsed.expenseDate ? parsed.expenseDate.toISOString() : null
   };
-  const existingIdentity = msg.from?.id
+  const telegramUserId = msg.from?.id ? BigInt(msg.from.id) : null;
+  const telegramChatId = BigInt(msg.chat.id);
+  const existingIdentity = telegramUserId
     ? await prisma.telegramIdentity.findUnique({
-        where: { telegramUserId: BigInt(msg.from.id) }
+        where: { telegramUserId }
       })
     : null;
+  const isLinkedChat =
+    !!existingIdentity &&
+    existingIdentity.telegramChatId !== null &&
+    existingIdentity.telegramChatId === telegramChatId;
 
   const telegramMessage = await prisma.telegramMessage.upsert({
     where: {
@@ -82,24 +107,24 @@ export async function ingestTelegramUpdate(update: TelegramUpdate) {
       }
     },
     update: {
-      userId: existingIdentity?.userId,
-      telegramUserId: msg.from?.id ? BigInt(msg.from.id) : null,
+      userId: isLinkedChat ? existingIdentity.userId : null,
+      telegramUserId,
       rawUpdate: rawUpdatePayload,
       rawText,
       parsedPayload
     },
     create: {
-      userId: existingIdentity?.userId,
-      chatId: BigInt(msg.chat.id),
+      userId: isLinkedChat ? existingIdentity.userId : null,
+      chatId: telegramChatId,
       messageId: msg.message_id,
-      telegramUserId: msg.from?.id ? BigInt(msg.from.id) : null,
+      telegramUserId,
       rawUpdate: rawUpdatePayload,
       rawText,
       parsedPayload
     }
   });
 
-  if (!existingIdentity?.userId) {
+  if (!isLinkedChat || !existingIdentity?.userId) {
     return { handled: true, linked: false, messageId: telegramMessage.id } as const;
   }
 
@@ -116,7 +141,9 @@ export async function ingestTelegramUpdate(update: TelegramUpdate) {
     parsed.amount && hasUnknownTaggedCategory ? "PENDING_REVIEW" : parsed.status;
 
   const expenseDate = parsed.expenseDate ?? new Date((msg.date ?? Date.now() / 1000) * 1000);
-  const description = parsed.description || rawText || "Telegram expense";
+  const fallbackDesc = stripLeadingTags(rawText);
+  const description =
+    parsed.description || (fallbackDesc && !isAmountOnlyText(fallbackDesc) ? fallbackDesc : "");
 
   const expense = await prisma.expense.upsert({
     where: { telegramMessageId: telegramMessage.id },
@@ -148,11 +175,11 @@ export async function ingestTelegramUpdate(update: TelegramUpdate) {
   const amountLabel = parsed.amount ? formatAmountCompactVnd(parsed.amount) : "0đ";
   const categoryName = category?.name ?? null;
   const replyText = parsed.amount
-    ? categoryName
-      ? `Đã thêm ${amountLabel} ${description} vào ${categoryName}`
+      ? categoryName
+      ? `Đã thêm ${amountLabel} ${description || "-"} vào ${categoryName}`
       : hasUnknownTaggedCategory
-        ? `Đã thêm ${amountLabel} ${description}. Tag chưa map category, đưa vào review queue`
-        : `Đã thêm ${amountLabel} ${description}`
+        ? `Đã thêm ${amountLabel} ${description || "-"}. Tag chưa map category, đưa vào review queue`
+        : `Đã thêm ${amountLabel} ${description || "-"}`
     : `Không parse được số tiền. Đã đưa vào review queue`;
 
   return {

@@ -4,27 +4,36 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useState } from "react";
 
 type CategoryOption = { slug: string; name: string };
+type MonthOption = { value: string; label: string };
 
-export function ExpensesToolbar({ categories }: { categories: CategoryOption[] }) {
+export function ExpensesToolbar({
+  categories,
+  monthOptions,
+  selectedMonth
+}: {
+  categories: CategoryOption[];
+  monthOptions: MonthOption[];
+  selectedMonth: string;
+}) {
   const router = useRouter();
   const searchParams = useSearchParams();
   const [q, setQ] = useState(searchParams.get("q") ?? "");
-  const [from, setFrom] = useState(searchParams.get("from") ?? "");
-  const [to, setTo] = useState(searchParams.get("to") ?? "");
+  const [month, setMonth] = useState(searchParams.get("month") ?? selectedMonth);
   const [category, setCategory] = useState(searchParams.get("category") ?? "");
   const [status, setStatus] = useState(searchParams.get("status") ?? "");
 
   useEffect(() => {
     setQ(searchParams.get("q") ?? "");
-    setFrom(searchParams.get("from") ?? "");
-    setTo(searchParams.get("to") ?? "");
+    setMonth(searchParams.get("month") ?? selectedMonth);
     setCategory(searchParams.get("category") ?? "");
     setStatus(searchParams.get("status") ?? "");
-  }, [searchParams]);
+  }, [searchParams, selectedMonth]);
 
   function apply(next: Record<string, string>) {
     const params = new URLSearchParams(searchParams.toString());
     params.delete("page");
+    params.delete("from");
+    params.delete("to");
     for (const [key, value] of Object.entries(next)) {
       if (value) params.set(key, value);
       else params.delete(key);
@@ -42,25 +51,26 @@ export function ExpensesToolbar({ categories }: { categories: CategoryOption[] }
 
   return (
     <div className="toolbar">
-      <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search text or Bill ID..." />
-      <input
-        type="date"
-        value={from}
+      <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search Bill ID..." />
+      <select
+        value={month}
+        disabled={monthOptions.length === 0}
         onChange={(e) => {
           const value = e.target.value;
-          setFrom(value);
-          apply({ from: value });
+          setMonth(value);
+          apply({ month: value });
         }}
-      />
-      <input
-        type="date"
-        value={to}
-        onChange={(e) => {
-          const value = e.target.value;
-          setTo(value);
-          apply({ to: value });
-        }}
-      />
+      >
+        {monthOptions.length === 0 ? (
+          <option value="">No month data</option>
+        ) : (
+          monthOptions.map((option) => (
+            <option key={option.value} value={option.value}>
+              {option.label}
+            </option>
+          ))
+        )}
+      </select>
       <select
         value={category}
         onChange={(e) => {

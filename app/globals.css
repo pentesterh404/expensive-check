@@ -406,9 +406,15 @@ button, input, select {
 
 .compare-form {
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 220px)) auto;
+  grid-template-columns: repeat(2, minmax(0, 260px)) auto;
   gap: 12px;
   align-items: end;
+}
+
+.compare-form-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
 }
 
 .compare-metrics {
@@ -431,8 +437,23 @@ button, input, select {
   min-height: clamp(360px, 48vw, 520px);
 }
 
+.compare-chart-card-empty {
+  min-height: 220px;
+}
+
 .compare-chart-wrap {
   height: clamp(300px, 42vw, 440px);
+}
+
+.compare-empty-state {
+  min-height: 120px;
+  border: 1px dashed var(--line);
+  border-radius: 12px;
+  background: rgba(255, 253, 248, 0.75);
+  padding: 16px;
+  display: grid;
+  align-content: center;
+  gap: 6px;
 }
 
 .compare-form label {
@@ -443,7 +464,8 @@ button, input, select {
   font-weight: 600;
 }
 
-.compare-form input[type="month"] {
+.compare-form input[type="month"],
+.compare-form select {
   border: 1px solid var(--line);
   border-radius: 12px;
   padding: 10px 12px;
@@ -899,6 +921,12 @@ th {
 
   .compare-form {
     grid-template-columns: 1fr;
+  }
+
+  .compare-form-actions {
+    width: 100%;
+    flex-direction: column;
+    align-items: stretch;
   }
 
   .compare-bar-row {

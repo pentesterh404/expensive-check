@@ -2,6 +2,24 @@
 
 Next.js App Router + Prisma + PostgreSQL (Supabase compatible) dashboard for personal expense tracking via Telegram bot messages.
 
+## Documentation Menu
+
+- [README](README.md)
+- [Deployment Guide](DEPLOY.md)
+- [Changelog](CHANGELOG.md)
+- [Product Spec](SPEC.md)
+
+### Quick Navigation
+
+- [Stack](#stack)
+- [Current Features](#current-features)
+- [Routes (UI)](#routes-ui)
+- [API Summary](#api-summary)
+- [Setup](#setup)
+- [Docker](#docker)
+- [Telegram Setup](#telegram-setup)
+- [Notes](#notes)
+
 ## Stack
 
 - Next.js (App Router, TypeScript)
@@ -19,10 +37,12 @@ Next.js App Router + Prisma + PostgreSQL (Supabase compatible) dashboard for per
 - Expenses:
   - list + filters + pagination
   - quick change category/wallet/status
+  - quick edit description (custom React modal)
   - Bill ID column + detail modal
   - bulk confirm/delete in review queue
   - Excel export
-  - search by text and Bill ID
+  - search by Bill ID
+  - month dropdown filter (only months that have data)
 - Categories:
   - CRUD
   - quick color update + color palette
@@ -33,6 +53,8 @@ Next.js App Router + Prisma + PostgreSQL (Supabase compatible) dashboard for per
   - category pie chart
 - Compare Months (`/compare`):
   - compare 2 months
+  - month dropdown from first month that has data
+  - swap months action
   - KPI summary + delta
   - category grouped vertical bar chart
   - category delta table
@@ -45,6 +67,11 @@ Next.js App Router + Prisma + PostgreSQL (Supabase compatible) dashboard for per
   - user manager
   - DB import/export (JSON)
   - SQL export via pg_dump endpoint
+  - verify Telegram bot token
+  - runtime config editor for:
+    - `NEXT_PUBLIC_BASE_URL`
+    - `TELEGRAM_BOT_USERNAME`
+    - `TELEGRAM_BOT_TOKEN`
 
 ## Routes (UI)
 
@@ -71,6 +98,8 @@ Next.js App Router + Prisma + PostgreSQL (Supabase compatible) dashboard for per
 - `PATCH /api/categories/:id`
 - `DELETE /api/categories/:id`
 - `POST /api/telegram/link`
+- `GET /api/telegram/link`
+- `DELETE /api/telegram/link`
 - `POST /api/telegram/webhook/:secret`
 - `GET /api/notifications`
 - `POST /api/admin/users`
@@ -79,6 +108,9 @@ Next.js App Router + Prisma + PostgreSQL (Supabase compatible) dashboard for per
 - `GET /api/admin/db-export`
 - `GET /api/admin/db-export-pgdump`
 - `POST /api/admin/db-import`
+- `GET /api/admin/telegram/verify-token`
+- `GET /api/admin/runtime-config`
+- `PUT /api/admin/runtime-config`
 - `POST /api/deletedb`
 
 ## Setup
@@ -153,3 +185,4 @@ curl -X POST "https://api.telegram.org/bot$TELEGRAM_BOT_TOKEN/setWebhook" \
 - `TELEGRAM_BOT_TOKEN` is server-side only.
 - If secrets are leaked, rotate immediately.
 - If you change Prisma schema, always run `npm run prisma:generate` before restart/build.
+- Runtime config updates from Admin Settings are written to local `.env` at server runtime.

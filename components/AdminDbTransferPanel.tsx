@@ -8,6 +8,7 @@ export function AdminDbTransferPanel() {
   const [isExporting, setIsExporting] = useState(false);
   const [isExportingSql, setIsExportingSql] = useState(false);
   const [isImporting, setIsImporting] = useState(false);
+  const [isVerifyingToken, setIsVerifyingToken] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const { showToast } = useToast();
@@ -38,6 +39,32 @@ export function AdminDbTransferPanel() {
       showToast("Database exported successfully.", "success");
     } finally {
       setIsExporting(false);
+    }
+  }
+
+  async function verifyTelegramToken() {
+    setIsVerifyingToken(true);
+    setError(null);
+    setMessage(null);
+    try {
+      const res = await fetch("/api/admin/telegram/verify-token", { cache: "no-store" });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        const detail = data?.details?.telegram_description
+          ? ` (${data.details.telegram_description})`
+          : "";
+        const msg = `${data.error || "Telegram token invalid"}${detail}`;
+        setError(msg);
+        showToast(msg, "error");
+        return;
+      }
+
+      const username = data?.bot?.username ? `@${data.bot.username}` : "unknown";
+      const msg = `Telegram token is valid for bot ${username}.`;
+      setMessage(msg);
+      showToast(msg, "success");
+    } finally {
+      setIsVerifyingToken(false);
     }
   }
 
@@ -118,7 +145,7 @@ export function AdminDbTransferPanel() {
         <button
           className="button secondary"
           type="button"
-          disabled={isExporting || isExportingSql || isImporting}
+          disabled={isExporting || isExportingSql || isImporting || isVerifyingToken}
           onClick={exportDb}
         >
           {isExporting ? "Exporting..." : "Export DB"}
@@ -126,10 +153,18 @@ export function AdminDbTransferPanel() {
         <button
           className="button secondary"
           type="button"
-          disabled={isExporting || isExportingSql || isImporting}
+          disabled={isExporting || isExportingSql || isImporting || isVerifyingToken}
           onClick={exportPgDump}
         >
           {isExportingSql ? "Exporting SQL..." : "Export SQL (pg_dump)"}
+        </button>
+        <button
+          className="button secondary"
+          type="button"
+          disabled={isExporting || isExportingSql || isImporting || isVerifyingToken}
+          onClick={verifyTelegramToken}
+        >
+          {isVerifyingToken ? "Verifying Token..." : "Verify Telegram Token"}
         </button>
       </div>
       <p className="muted" style={{ marginTop: 8, marginBottom: 0 }}>
@@ -141,12 +176,12 @@ export function AdminDbTransferPanel() {
           ref={fileRef}
           type="file"
           accept="application/json,.json"
-          disabled={isImporting || isExporting || isExportingSql}
+          disabled={isImporting || isExporting || isExportingSql || isVerifyingToken}
         />
         <button
           className="button"
           type="button"
-          disabled={isImporting || isExporting || isExportingSql}
+          disabled={isImporting || isExporting || isExportingSql || isVerifyingToken}
           onClick={importDb}
         >
           {isImporting ? "Importing..." : "Import DB"}
