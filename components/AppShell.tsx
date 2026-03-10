@@ -1,31 +1,27 @@
 import type { ReactNode } from "react";
-import { AppNav } from "@/components/AppNav";
 import { getSessionUser } from "@/lib/auth/session";
 import { isAdminEmail } from "@/lib/auth/roles";
-import { UserMenu } from "@/components/UserMenu";
+import { SidebarProvider } from "./SidebarProvider";
+import { AppShellClient } from "./AppShellClient";
 
-export async function AppShell({
-  children,
-  showTopbar = true
-}: {
+export async function AppShell(props: {
   children: ReactNode;
   showTopbar?: boolean;
+  title?: string;
+  subtitle?: string;
 }) {
-  const user = await getSessionUser();
-  const isAdmin = isAdminEmail(user?.email);
+  try {
+    const user = await getSessionUser();
+    const isAdmin = isAdminEmail(user?.email);
 
-  return (
-    <div className="app-shell">
-      <AppNav isAdmin={isAdmin} />
-      <main className="main">
-        {showTopbar ? (
-          <div className="topbar">
-            <div />
-            <UserMenu user={user} />
-          </div>
-        ) : null}
-        {children}
-      </main>
-    </div>
-  );
+    return (
+      <SidebarProvider>
+        <AppShellClient {...props} user={user} isAdmin={isAdmin} />
+      </SidebarProvider>
+    );
+  } catch (err: any) {
+    console.error(">>> APPSHELL_ERROR:", err);
+    if (err?.stack) console.error(err.stack);
+    throw err;
+  }
 }

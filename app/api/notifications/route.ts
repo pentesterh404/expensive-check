@@ -67,13 +67,13 @@ export async function GET(req: Request) {
         message:
           item.expenses[0]
             ? (() => {
-                const amountLabel = formatAmountCompactVnd(Number(item.expenses[0].amount));
-                const desc = item.expenses[0].description ?? item.rawText ?? "";
-                const categoryName = item.expenses[0].category?.name ?? null;
-                return categoryName
-                  ? `Đã thêm ${amountLabel} ${desc} vào ${categoryName}`
-                  : `Đã thêm ${amountLabel} ${desc}`;
-              })()
+              const amountLabel = formatAmountCompactVnd(Number(item.expenses[0].amount));
+              const desc = item.expenses[0].description ?? item.rawText ?? "";
+              const categoryName = item.expenses[0].category?.name ?? null;
+              return categoryName
+                ? `Đã thêm ${amountLabel} ${desc} vào ${categoryName}`
+                : `Đã thêm ${amountLabel} ${desc}`;
+            })()
             : item.rawText ?? "Telegram message",
         id: item.id,
         text: item.rawText ?? "",
@@ -81,17 +81,17 @@ export async function GET(req: Request) {
         expense:
           item.expenses[0]
             ? {
-                id: item.expenses[0].id,
-                amount: Number(item.expenses[0].amount),
-                description: item.expenses[0].description,
-                status: item.expenses[0].status,
-                expenseDate: item.expenses[0].expenseDate.toISOString(),
-                currency: item.expenses[0].currency,
-                tags: item.expenses[0].tags,
-                wallet: item.expenses[0].wallet,
-                categoryName: item.expenses[0].category?.name ?? null,
-                rawText: item.expenses[0].rawText
-              }
+              id: item.expenses[0].id,
+              amount: Number(item.expenses[0].amount),
+              description: item.expenses[0].description,
+              status: item.expenses[0].status,
+              expenseDate: item.expenses[0].expenseDate.toISOString(),
+              currency: item.expenses[0].currency,
+              tags: item.expenses[0].tags,
+              wallet: item.expenses[0].wallet,
+              categoryName: item.expenses[0].category?.name ?? null,
+              rawText: item.expenses[0].rawText
+            }
             : null
       }))
     });

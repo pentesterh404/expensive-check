@@ -2,7 +2,6 @@ import type { Prisma } from "@prisma/client";
 import { AppShell } from "@/components/AppShell";
 import { ExpensesTable } from "@/components/ExpensesTable";
 import { ExpensesToolbar } from "@/components/ExpensesToolbar";
-import { UserMenu } from "@/components/UserMenu";
 import { demoExpenses } from "@/lib/demo-data";
 import { getSessionUser } from "@/lib/auth/session";
 import { prisma } from "@/lib/db";
@@ -38,11 +37,11 @@ export default async function ExpensesPage({
   const monthOptions: MonthOption[] =
     monthRows.length > 0
       ? monthRows.map((row) => {
-          const date = new Date(row.month_start);
-          const value = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}`;
-          const label = date.toLocaleDateString("en-US", { month: "long", year: "numeric" });
-          return { value, label };
-        })
+        const date = new Date(row.month_start);
+        const value = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}`;
+        const label = date.toLocaleDateString("en-US", { month: "long", year: "numeric" });
+        return { value, label };
+      })
       : [];
   const selectedMonth = monthOptions.some((option) => option.value === month)
     ? month
@@ -60,11 +59,11 @@ export default async function ExpensesPage({
     status: { not: "DELETED" },
     ...(selectedMonthRange
       ? {
-          expenseDate: {
-            gte: selectedMonthRange.start,
-            lt: selectedMonthRange.end
-          }
+        expenseDate: {
+          gte: selectedMonthRange.start,
+          lt: selectedMonthRange.end
         }
+      }
       : {}),
     ...(category ? { category: { slug: category } } : {}),
     ...(status === "REVIEW_QUEUE"
@@ -74,22 +73,22 @@ export default async function ExpensesPage({
         : {}),
     ...(q
       ? {
-          id: { contains: q, mode: "insensitive" }
-        }
+        id: { contains: q, mode: "insensitive" }
+      }
       : {})
   };
 
   const [totalCount, categoryOptions]: [number, CategoryOption[]] = user
     ? await Promise.all([
-        prisma.expense.count({
-          where: { userId: user.id, ...baseWhere }
-        }),
-        prisma.category.findMany({
-          where: { userId: user.id },
-          select: { id: true, slug: true, name: true },
-          orderBy: { name: "asc" }
-        })
-      ])
+      prisma.expense.count({
+        where: { userId: user.id, ...baseWhere }
+      }),
+      prisma.category.findMany({
+        where: { userId: user.id },
+        select: { id: true, slug: true, name: true },
+        orderBy: { name: "asc" }
+      })
+    ])
     : [demoExpenses.length, []];
   const totalPages = Math.max(1, Math.ceil(totalCount / PAGE_SIZE));
   const currentPage = Math.min(requestedPage, totalPages);
@@ -97,63 +96,58 @@ export default async function ExpensesPage({
 
   const dbExpenses = user
     ? await prisma.expense.findMany({
-        where: { userId: user.id, ...baseWhere },
-        select: {
-          id: true,
-          expenseDate: true,
-          createdAt: true,
-          description: true,
-          rawText: true,
-          amount: true,
-          tags: true,
-          wallet: true,
-          status: true,
-          category: {
-            select: { name: true, slug: true }
-          },
-          telegramMessage: {
-            select: { createdAt: true }
-          }
+      where: { userId: user.id, ...baseWhere },
+      select: {
+        id: true,
+        expenseDate: true,
+        createdAt: true,
+        description: true,
+        rawText: true,
+        amount: true,
+        tags: true,
+        wallet: true,
+        status: true,
+        category: {
+          select: { name: true, slug: true }
         },
-        orderBy: { expenseDate: "desc" },
-        skip: offset,
-        take: PAGE_SIZE
-      })
+        telegramMessage: {
+          select: { createdAt: true }
+        }
+      },
+      orderBy: { expenseDate: "desc" },
+      skip: offset,
+      take: PAGE_SIZE
+    })
     : [];
 
   const rows = user
-      ? dbExpenses.map((e) => ({
-        id: e.id,
-        expenseDate: e.expenseDate.toISOString().slice(0, 10),
-        receivedAt: (e.telegramMessage?.createdAt ?? e.createdAt).toISOString(),
-        description: e.description ?? "",
-        amount: Number(e.amount),
-        category: e.category?.name ?? null,
-        categorySlug: e.category?.slug ?? null,
-        tags: e.tags,
-        wallet: e.wallet,
-        status: e.status
-      }))
+    ? dbExpenses.map((e) => ({
+      id: e.id,
+      expenseDate: e.expenseDate.toISOString().slice(0, 10),
+      receivedAt: (e.telegramMessage?.createdAt ?? e.createdAt).toISOString(),
+      description: e.description ?? "",
+      amount: Number(e.amount),
+      category: e.category?.name ?? null,
+      categorySlug: e.category?.slug ?? null,
+      tags: e.tags,
+      wallet: e.wallet,
+      status: e.status
+    }))
     : demoExpenses.slice(offset, offset + PAGE_SIZE);
 
   return (
-    <AppShell showTopbar={false}>
-      <div className="page">
-        <section className="hero">
-          <div className="hero-head">
-            <div>
-              <h1>Expenses</h1>
-              <p>Filter by date, category, text, and status. Review Queue supports bulk confirm/delete.</p>
-            </div>
-            <UserMenu user={user} />
-          </div>
-        </section>
-
-        <section className="card">
+    <AppShell
+      showTopbar={true}
+      title="Expenses Management"
+      subtitle="Track and categorize your spending"
+    >
+      <div className="page" style={{ gap: 20 }}>
+        <section className="card" style={{ padding: '16px 20px' }}>
           <ExpensesToolbar
             categories={categoryOptions}
             monthOptions={monthOptions}
             selectedMonth={selectedMonth}
+            rows={rows as any}
           />
         </section>
 

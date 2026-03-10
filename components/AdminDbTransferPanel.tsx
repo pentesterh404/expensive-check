@@ -2,6 +2,7 @@
 
 import { useRef, useState } from "react";
 import { useToast } from "@/components/ToastProvider";
+import { ConfirmDialog } from "@/components/ConfirmDialog";
 
 export function AdminDbTransferPanel() {
   const fileRef = useRef<HTMLInputElement | null>(null);
@@ -11,185 +12,104 @@ export function AdminDbTransferPanel() {
   const [isVerifyingToken, setIsVerifyingToken] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [showImportConfirm, setShowImportConfirm] = useState(false);
   const { showToast } = useToast();
+  const busy = isExporting || isExportingSql || isImporting || isVerifyingToken;
 
   async function exportDb() {
-    setIsExporting(true);
-    setError(null);
-    setMessage(null);
+    setIsExporting(true); setError(null); setMessage(null);
     try {
       const res = await fetch("/api/admin/db-export");
-      if (!res.ok) {
-        const data = await res.json().catch(() => ({}));
-        const msg = data.error || "Failed to export DB";
-        setError(msg);
-        showToast(msg, "error");
-        return;
-      }
+      if (!res.ok) { const d = await res.json().catch(() => ({})); const m = d.error || "Export failed"; setError(m); showToast(m, "error"); return; }
       const blob = await res.blob();
-      const url = window.URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      a.href = url;
-      a.download = `expense-tracker-backup-${new Date().toISOString().replace(/[:.]/g, "-")}.json`;
-      document.body.appendChild(a);
-      a.click();
-      a.remove();
-      window.URL.revokeObjectURL(url);
-      setMessage("Database exported successfully.");
-      showToast("Database exported successfully.", "success");
-    } finally {
-      setIsExporting(false);
-    }
+      const a = Object.assign(document.createElement("a"), { href: URL.createObjectURL(blob), download: `backup-${new Date().toISOString().replace(/[:.]/g, "-")}.json` });
+      document.body.appendChild(a); a.click(); a.remove(); URL.revokeObjectURL(a.href);
+      setMessage("JSON exported."); showToast("Database exported.", "success");
+    } finally { setIsExporting(false); }
+  }
+
+  async function exportPgDump() {
+    setIsExportingSql(true); setError(null); setMessage(null);
+    try {
+      const res = await fetch("/api/admin/db-export-pgdump");
+      if (!res.ok) { const d = await res.json().catch(() => ({})); const m = d.error || "SQL export failed"; setError(m); showToast(m, "error"); return; }
+      const blob = await res.blob();
+      const a = Object.assign(document.createElement("a"), { href: URL.createObjectURL(blob), download: `pgdump-${new Date().toISOString().replace(/[:.]/g, "-")}.sql` });
+      document.body.appendChild(a); a.click(); a.remove(); URL.revokeObjectURL(a.href);
+      setMessage("SQL exported."); showToast("SQL export done.", "success");
+    } finally { setIsExportingSql(false); }
   }
 
   async function verifyTelegramToken() {
-    setIsVerifyingToken(true);
-    setError(null);
-    setMessage(null);
+    setIsVerifyingToken(true); setError(null); setMessage(null);
     try {
       const res = await fetch("/api/admin/telegram/verify-token", { cache: "no-store" });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) {
-        const detail = data?.details?.telegram_description
-          ? ` (${data.details.telegram_description})`
-          : "";
-        const msg = `${data.error || "Telegram token invalid"}${detail}`;
-        setError(msg);
-        showToast(msg, "error");
-        return;
+        const detail = data?.details?.telegram_description ? ` (${data.details.telegram_description})` : "";
+        const m = `${data.error || "Token invalid"}${detail}`; setError(m); showToast(m, "error"); return;
       }
-
-      const username = data?.bot?.username ? `@${data.bot.username}` : "unknown";
-      const msg = `Telegram token is valid for bot ${username}.`;
-      setMessage(msg);
-      showToast(msg, "success");
-    } finally {
-      setIsVerifyingToken(false);
-    }
+      const un = data?.bot?.username ? `@${data.bot.username}` : "unknown";
+      const m = `Valid for bot ${un}.`; setMessage(m); showToast(m, "success");
+    } finally { setIsVerifyingToken(false); }
   }
 
-  async function exportPgDump() {
-    setIsExportingSql(true);
-    setError(null);
-    setMessage(null);
-    try {
-      const res = await fetch("/api/admin/db-export-pgdump");
-      if (!res.ok) {
-        const data = await res.json().catch(() => ({}));
-        const msg = data.error || "Failed to export SQL with pg_dump";
-        setError(msg);
-        showToast(msg, "error");
-        return;
-      }
-      const blob = await res.blob();
-      const url = window.URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      a.href = url;
-      a.download = `expense-tracker-pgdump-${new Date().toISOString().replace(/[:.]/g, "-")}.sql`;
-      document.body.appendChild(a);
-      a.click();
-      a.remove();
-      window.URL.revokeObjectURL(url);
-      setMessage("SQL backup exported successfully.");
-      showToast("SQL backup exported successfully.", "success");
-    } finally {
-      setIsExportingSql(false);
-    }
+  function importDb() {
+    if (!fileRef.current?.files?.[0]) { setError("Choose a backup file."); showToast("Choose a file.", "error"); return; }
+    setShowImportConfirm(true);
   }
 
-  async function importDb() {
-    const file = fileRef.current?.files?.[0];
-    if (!file) {
-      setError("Please choose a backup file.");
-      showToast("Please choose a backup file.", "error");
-      return;
-    }
-
-    if (!window.confirm("Import will replace the current database. Continue?")) {
-      return;
-    }
-
-    setIsImporting(true);
-    setError(null);
-    setMessage(null);
+  async function executeImport() {
+    const file = fileRef.current?.files?.[0]; if (!file) return;
+    setShowImportConfirm(false); setIsImporting(true); setError(null); setMessage(null);
     try {
-      const form = new FormData();
-      form.append("file", file);
-
-      const res = await fetch("/api/admin/db-import", {
-        method: "POST",
-        body: form
-      });
+      const fd = new FormData(); fd.append("file", file);
+      const res = await fetch("/api/admin/db-import", { method: "POST", body: fd });
       const data = await res.json().catch(() => ({}));
-      if (!res.ok) {
-        const msg = data.error || "Failed to import DB";
-        setError(msg);
-        showToast(msg, "error");
-        return;
-      }
-      setMessage("Database import completed.");
-      showToast("Database import completed.", "success");
+      if (!res.ok) { const m = data.error || "Import failed"; setError(m); showToast(m, "error"); return; }
+      setMessage("Import completed."); showToast("Import done.", "success");
       if (fileRef.current) fileRef.current.value = "";
-    } finally {
-      setIsImporting(false);
-    }
+    } finally { setIsImporting(false); }
   }
 
   return (
-    <div className="card" style={{ marginTop: 14 }}>
-      <h4 style={{ marginTop: 0, marginBottom: 8 }}>Database Backup</h4>
-      <p className="muted" style={{ marginTop: 0 }}>
-        Admin only. Export full database to JSON, or import a JSON backup to restore data.
-      </p>
-      <div className="toolbar">
-        <button
-          className="button secondary"
-          type="button"
-          disabled={isExporting || isExportingSql || isImporting || isVerifyingToken}
-          onClick={exportDb}
-        >
-          {isExporting ? "Exporting..." : "Export DB"}
-        </button>
-        <button
-          className="button secondary"
-          type="button"
-          disabled={isExporting || isExportingSql || isImporting || isVerifyingToken}
-          onClick={exportPgDump}
-        >
-          {isExportingSql ? "Exporting SQL..." : "Export SQL (pg_dump)"}
-        </button>
-        <button
-          className="button secondary"
-          type="button"
-          disabled={isExporting || isExportingSql || isImporting || isVerifyingToken}
-          onClick={verifyTelegramToken}
-        >
-          {isVerifyingToken ? "Verifying Token..." : "Verify Telegram Token"}
-        </button>
-      </div>
-      <p className="muted" style={{ marginTop: 8, marginBottom: 0 }}>
-        `Export SQL (pg_dump)` requires `pg_dump` binary on the server runtime.
-      </p>
+    <div>
+      <h4 style={{ margin: "0 0 4px", fontSize: "0.95rem", fontWeight: 600 }}>Database Operations</h4>
+      <p className="muted" style={{ margin: "0 0 16px", fontSize: "0.8rem" }}>Export or import database backups</p>
 
-      <div className="toolbar" style={{ marginTop: 10, alignItems: "center" }}>
-        <input
-          ref={fileRef}
-          type="file"
-          accept="application/json,.json"
-          disabled={isImporting || isExporting || isExportingSql || isVerifyingToken}
-        />
-        <button
-          className="button"
-          type="button"
-          disabled={isImporting || isExporting || isExportingSql || isVerifyingToken}
-          onClick={importDb}
-        >
-          {isImporting ? "Importing..." : "Import DB"}
+      <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
+        <button className="s-btn s-btn--ghost" disabled={busy} onClick={exportDb}>
+          {isExporting ? "Exporting…" : "JSON Export"}
+        </button>
+        <button className="s-btn s-btn--ghost" disabled={busy} onClick={exportPgDump}>
+          {isExportingSql ? "Running…" : "SQL Export"}
+        </button>
+        <button className="s-btn s-btn--ghost" disabled={busy} onClick={verifyTelegramToken}>
+          {isVerifyingToken ? "Checking…" : "Verify Bot Token"}
         </button>
       </div>
 
-      {message && <div style={{ color: "#166534", marginTop: 10 }}>{message}</div>}
-      {error && <div style={{ color: "#b42318", marginTop: 10 }}>{error}</div>}
+      <div style={{ marginTop: 20, padding: "16px 20px", borderRadius: "var(--radius-md)", border: "1px dashed var(--line)", background: "var(--bg)", display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
+        <div style={{ flex: 1, minWidth: 180 }}>
+          <input ref={fileRef} type="file" accept="application/json,.json" disabled={busy} style={{ fontSize: "0.8rem" }} />
+        </div>
+        <button className="s-btn s-btn--primary" disabled={busy} onClick={importDb}>
+          {isImporting ? "Importing…" : "Import"}
+        </button>
+      </div>
+
+      {(message || error) && <div className={`s-msg ${error ? "s-msg--err" : "s-msg--ok"}`} style={{ marginTop: 12 }}>{message || error}</div>}
+
+      <ConfirmDialog
+        isOpen={showImportConfirm}
+        title="Import Database"
+        message="This will replace ALL current data. This action is irreversible."
+        confirmLabel="Import & Replace"
+        isDestructive
+        isLoading={isImporting}
+        onConfirm={executeImport}
+        onCancel={() => setShowImportConfirm(false)}
+      />
     </div>
   );
 }

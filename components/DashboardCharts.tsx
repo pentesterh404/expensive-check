@@ -16,6 +16,27 @@ import {
 } from "recharts";
 import type { DashboardSummary } from "@/lib/types";
 
+function CustomTooltip({ active, payload, label, formatCurrency }: any) {
+  if (active && payload && payload.length) {
+    return (
+      <div className="card" style={{
+        padding: "12px 16px",
+        border: "1px solid var(--line)",
+        background: "var(--panel)",
+        backdropFilter: "blur(12px)",
+        boxShadow: "var(--shadow-lg)",
+        borderRadius: "var(--radius-md)"
+      }}>
+        <p style={{ margin: 0, fontWeight: 600, fontSize: "0.8125rem", color: "var(--muted)", textTransform: 'uppercase', letterSpacing: '0.05em' }}>{label}</p>
+        <p style={{ margin: "4px 0 0", color: "var(--ink)", fontWeight: 700, fontSize: '1.125rem' }}>
+          {formatCurrency(payload[0].value)}
+        </p>
+      </div>
+    );
+  }
+  return null;
+}
+
 export function DashboardCharts({ summary }: { summary: DashboardSummary }) {
   const [isNarrow, setIsNarrow] = useState(false);
   const totalByCategory = summary.byCategory.reduce((sum, item) => sum + item.value, 0);
@@ -45,31 +66,44 @@ export function DashboardCharts({ summary }: { summary: DashboardSummary }) {
         </div>
         <div className="chart-container">
           <ResponsiveContainer width="100%" height="100%">
-          <AreaChart data={summary.dailySeries}>
-            <CartesianGrid strokeDasharray="4 4" stroke="#ded4c2" />
-            <XAxis
-              dataKey="date"
-              tick={{ fontSize: 12 }}
-              tickFormatter={(value: string) => new Date(value).toLocaleDateString("en-GB", { day: "2-digit", month: "2-digit" })}
-            />
-            <YAxis
-              tick={{ fontSize: 12 }}
-              tickFormatter={(value: number) => new Intl.NumberFormat("en-US", { notation: "compact", maximumFractionDigits: 1 }).format(value)}
-            />
-            <Tooltip
-              formatter={(value: number) => [formatCurrency(Number(value ?? 0)), "Amount"]}
-              labelFormatter={(value: string) => new Date(value).toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" })}
-            />
-            <Area
-              type="monotone"
-              dataKey="amount"
-              fill="rgba(34, 90, 67, 0.18)"
-              stroke="#225a43"
-              strokeWidth={3}
-              dot={{ r: 3 }}
-            />
-          </AreaChart>
-        </ResponsiveContainer>
+            <AreaChart data={summary.dailySeries} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
+              <defs>
+                <linearGradient id="colorAmount" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="5%" stopColor="var(--primary)" stopOpacity={0.15} />
+                  <stop offset="95%" stopColor="var(--primary)" stopOpacity={0} />
+                </linearGradient>
+              </defs>
+              <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="rgba(0,0,0,0.05)" />
+              <XAxis
+                dataKey="date"
+                axisLine={false}
+                tickLine={false}
+                tick={{ fontSize: 11, fill: "var(--muted)" }}
+                tickFormatter={(value: string) => new Date(value).toLocaleDateString("en-GB", { day: "2-digit", month: "2-digit" })}
+              />
+              <YAxis
+                axisLine={false}
+                tickLine={false}
+                tick={{ fontSize: 11, fill: "var(--muted)" }}
+                tickFormatter={(value: number) => new Intl.NumberFormat("en-US", { notation: "compact", maximumFractionDigits: 1 }).format(value)}
+              />
+              <Tooltip
+                content={<CustomTooltip formatCurrency={formatCurrency} />}
+                cursor={{ stroke: 'var(--accent)', strokeWidth: 1, strokeDasharray: '4 4' }}
+              />
+              <Area
+                type="monotone"
+                dataKey="amount"
+                stroke="var(--primary)"
+                strokeWidth={3}
+                fillOpacity={1}
+                fill="url(#colorAmount)"
+                animationDuration={1500}
+                dot={{ r: 4, fill: "#fff", stroke: "var(--primary)", strokeWidth: 2 }}
+                activeDot={{ r: 6, strokeWidth: 0, fill: 'var(--primary)' }}
+              />
+            </AreaChart>
+          </ResponsiveContainer>
         </div>
       </div>
       <div className="card chart-card chart-card-pie">
@@ -79,41 +113,61 @@ export function DashboardCharts({ summary }: { summary: DashboardSummary }) {
         </div>
         <div className="chart-container">
           <ResponsiveContainer width="100%" height="100%">
-          <PieChart margin={{ top: 8, right: 24, bottom: 8, left: 24 }}>
-            <Tooltip
-              formatter={(value: number, name: string) => {
-                const amount = Number(value ?? 0);
-                const percent = totalByCategory > 0 ? (amount / totalByCategory) * 100 : 0;
-                return [`${formatCurrency(amount)} (${percent.toFixed(2)}%)`, name || "Category"];
-              }}
-            />
-            <Legend
-              layout={isNarrow ? "horizontal" : "vertical"}
-              align={isNarrow ? "center" : "right"}
-              verticalAlign={isNarrow ? "bottom" : "middle"}
-              wrapperStyle={isNarrow ? { paddingTop: 8 } : { right: 22 }}
-            />
-            <Pie
-              data={summary.byCategory}
-              dataKey="value"
-              nameKey="name"
-              cx={isNarrow ? "50%" : "42%"}
-              cy={isNarrow ? "44%" : "50%"}
-              outerRadius={isNarrow ? 108 : 132}
-              innerRadius={0}
-              paddingAngle={2}
-              label={false}
-              labelLine={false}
-            >
-              {summary.byCategory.map((entry, index) => (
-                <Cell
-                  key={`${entry.name}-${index}`}
-                  fill={entry.color || "#d56f36"}
-                />
-              ))}
-            </Pie>
-          </PieChart>
-        </ResponsiveContainer>
+            <PieChart margin={{ top: 0, right: 0, bottom: 0, left: 0 }}>
+              <Tooltip
+                content={({ active, payload }: any) => {
+                  if (active && payload && payload.length) {
+                    const data = payload[0].payload;
+                    const percent = totalByCategory > 0 ? (data.value / totalByCategory) * 100 : 0;
+                    return (
+                      <div className="card" style={{
+                        padding: "12px 16px",
+                        border: "1px solid var(--line)",
+                        background: "var(--panel)",
+                        backdropFilter: "blur(12px)",
+                        boxShadow: "var(--shadow-lg)",
+                        borderRadius: "var(--radius-md)"
+                      }}>
+                        <p style={{ margin: 0, fontWeight: 600, fontSize: "0.8125rem", color: "var(--muted)", textTransform: 'uppercase', letterSpacing: '0.05em' }}>{data.name}</p>
+                        <p style={{ margin: "4px 0 0", color: "var(--ink)", fontWeight: 700, fontSize: '1.125rem' }}>
+                          {formatCurrency(data.value)} <span style={{ color: 'var(--muted)', fontWeight: 500, fontSize: '0.875rem' }}>({percent.toFixed(1)}%)</span>
+                        </p>
+                      </div>
+                    );
+                  }
+                  return null;
+                }}
+              />
+              <Legend
+                layout={isNarrow ? "horizontal" : "vertical"}
+                align={isNarrow ? "center" : "right"}
+                verticalAlign={isNarrow ? "bottom" : "middle"}
+                iconType="circle"
+                wrapperStyle={isNarrow ? { paddingTop: 20 } : { paddingLeft: 20 }}
+              />
+              <Pie
+                data={summary.byCategory}
+                dataKey="value"
+                nameKey="name"
+                cx={isNarrow ? "50%" : "40%"}
+                cy={isNarrow ? "40%" : "50%"}
+                outerRadius={isNarrow ? 100 : 120}
+                innerRadius={isNarrow ? 60 : 80}
+                stroke="none"
+                paddingAngle={5}
+                animationBegin={0}
+                animationDuration={1200}
+              >
+                {summary.byCategory.map((entry, index) => (
+                  <Cell
+                    key={`${entry.name}-${index}`}
+                    fill={entry.color || "#3b82f6"}
+                    className="pie-cell"
+                  />
+                ))}
+              </Pie>
+            </PieChart>
+          </ResponsiveContainer>
         </div>
       </div>
     </section>

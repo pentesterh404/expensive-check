@@ -168,28 +168,31 @@ export function CategoriesManager({ categories }: { categories: CategoryRow[] })
   }
 
   return (
-    <section className="grid cols-2">
-      <div className="card">
-        <h3 style={{ marginTop: 0 }}>Create Category</h3>
-        <div className="toolbar" style={{ display: "grid" }}>
-          <input
-            placeholder="Name (e.g. Food)"
-            value={form.name}
-            onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))}
-          />
-          <input
-            placeholder="Slug (e.g. food)"
-            value={form.slug}
-            onChange={(e) => setForm((f) => ({ ...f, slug: e.target.value }))}
-          />
-          <input
-            placeholder="Color (#d56f36)"
-            value={form.color}
-            onChange={(e) => setForm((f) => ({ ...f, color: e.target.value }))}
-          />
-          <div className="card" style={{ padding: 12 }}>
-            <div style={{ marginBottom: 8, fontWeight: 600 }}>Color Palette</div>
-            <div className="toolbar" style={{ gap: 8 }}>
+    <div className="grid cols-2-to-1" style={{ alignItems: "start" }}>
+      <div className="card categories-form-card">
+        <h3 style={{ marginTop: 0, fontSize: "1.1rem", fontWeight: 700 }}>New Category</h3>
+        <p className="muted" style={{ marginBottom: 20, fontSize: "0.9rem" }}>Create a new category for your expenses.</p>
+        <div className="toolbar" style={{ display: "grid", gap: 16 }}>
+          <div style={{ display: "grid", gap: 6 }}>
+            <span style={{ fontSize: "0.85rem", fontWeight: 600, color: "var(--muted)" }}>Category Name</span>
+            <input
+              placeholder="e.g. Food & Dining"
+              value={form.name}
+              onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))}
+            />
+          </div>
+          <div style={{ display: "grid", gap: 6 }}>
+            <span style={{ fontSize: "0.85rem", fontWeight: 600, color: "var(--muted)" }}>Slug (Unique Key)</span>
+            <input
+              placeholder="e.g. food-dining"
+              value={form.slug}
+              onChange={(e) => setForm((f) => ({ ...f, slug: e.target.value }))}
+            />
+          </div>
+
+          <div className="card" style={{ padding: 16, background: "rgba(0,0,0,0.02)", border: "1px dashed var(--line)" }}>
+            <div style={{ marginBottom: 12, fontWeight: 700, fontSize: "0.85rem", color: "var(--ink)" }}>Color Identity</div>
+            <div className="toolbar" style={{ gap: 8, flexWrap: 'wrap' }}>
               {COLOR_PRESETS.map((color) => {
                 const selected = form.color.toLowerCase() === color.toLowerCase();
                 return (
@@ -202,80 +205,99 @@ export function CategoriesManager({ categories }: { categories: CategoryRow[] })
                     style={{
                       width: 28,
                       height: 28,
-                      borderRadius: 999,
-                      border: selected ? "2px solid #1d1b16" : "1px solid #ded4c2",
+                      borderRadius: "6px",
+                      border: "none",
                       background: color,
                       cursor: "pointer",
-                      padding: 0
+                      padding: 0,
+                      boxShadow: selected ? `0 0 0 2px white, 0 0 0 4px ${color}` : "var(--shadow-sm)",
+                      transition: "all 0.2s ease"
                     }}
                   />
                 );
               })}
-              <input
-                type="color"
-                value={/^#([0-9a-f]{6})$/i.test(form.color) ? form.color : "#d56f36"}
-                onChange={(e) => setForm((f) => ({ ...f, color: e.target.value }))}
-                title="Custom color"
-                style={{
-                  width: 40,
-                  height: 28,
-                  border: "1px solid #ded4c2",
-                  borderRadius: 8,
-                  padding: 2,
-                  background: "#fff"
-                }}
-              />
+              <div style={{ position: "relative", width: 40, height: 28 }}>
+                <input
+                  type="color"
+                  value={/^#([0-9a-f]{6})$/i.test(form.color) ? form.color : "#6366f1"}
+                  onChange={(e) => setForm((f) => ({ ...f, color: e.target.value }))}
+                  title="Custom color"
+                  style={{
+                    width: "100%",
+                    height: "100%",
+                    border: "1px solid var(--line)",
+                    borderRadius: "6px",
+                    padding: 0,
+                    cursor: "pointer",
+                    background: "none"
+                  }}
+                />
+              </div>
             </div>
-            <div className="muted" style={{ marginTop: 8, display: "flex", gap: 8, alignItems: "center" }}>
-              <span>Preview:</span>
+            <div className="muted" style={{ marginTop: 12, display: "flex", gap: 8, alignItems: "center", fontSize: "0.85rem" }}>
+              <span>Preview Label:</span>
               <span
                 className="badge"
                 style={{
-                  borderColor: form.color || "#ded4c2",
-                  background: form.color ? `${form.color}22` : undefined
+                  color: form.color || "var(--ink)",
+                  borderColor: form.color || "var(--line)",
+                  background: form.color ? `${form.color}15` : "transparent",
+                  fontWeight: 600
                 }}
               >
-                {form.color || "No color selected"}
+                {form.name || "Preview"}
               </span>
             </div>
           </div>
-          <input
-            placeholder="Icon (optional)"
-            value={form.icon}
-            onChange={(e) => setForm((f) => ({ ...f, icon: e.target.value }))}
-          />
-          <button className="button" type="button" disabled={isPending} onClick={onCreate}>
+
+          <div style={{ display: "grid", gap: 6 }}>
+            <span style={{ fontSize: "0.85rem", fontWeight: 600, color: "var(--muted)" }}>Icon (Optional)</span>
+            <input
+              placeholder="e.g. 🍔"
+              value={form.icon}
+              onChange={(e) => setForm((f) => ({ ...f, icon: e.target.value }))}
+            />
+          </div>
+
+          <button className="button" type="button" disabled={isPending} onClick={onCreate} style={{ marginTop: 8 }}>
             {isPending && pendingAction === "create" ? "Creating..." : "Create Category"}
           </button>
-          {error && <div style={{ color: "#b42318" }}>{error}</div>}
+          {error && <div style={{ color: "var(--error)", fontSize: "0.85rem", marginTop: 4 }}>{error}</div>}
         </div>
       </div>
 
       <div className="card">
-        <h3 style={{ marginTop: 0 }}>Existing Categories</h3>
+        <header style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 20 }}>
+          <h3 style={{ margin: 0, fontSize: "1.1rem", fontWeight: 700 }}>Existing Categories</h3>
+          <span className="badge" style={{ background: "var(--primary-light)", color: "var(--primary)", border: "none" }}>
+            {categories.length} total
+          </span>
+        </header>
 
         {editingId ? (
-          <div className="card" style={{ marginBottom: 12 }}>
-            <h4 style={{ marginTop: 0 }}>Edit Category</h4>
-            <div className="toolbar" style={{ display: "grid" }}>
-              <input
-                placeholder="Name"
-                value={editForm.name}
-                onChange={(e) => setEditForm((f) => ({ ...f, name: e.target.value }))}
-              />
-              <input
-                placeholder="Slug"
-                value={editForm.slug}
-                onChange={(e) => setEditForm((f) => ({ ...f, slug: e.target.value }))}
-              />
-              <input
-                placeholder="Color"
-                value={editForm.color}
-                onChange={(e) => setEditForm((f) => ({ ...f, color: e.target.value }))}
-              />
-              <div className="card" style={{ padding: 12 }}>
-                <div style={{ marginBottom: 8, fontWeight: 600 }}>Color Palette</div>
-                <div className="toolbar" style={{ gap: 8 }}>
+          <div className="card" style={{ marginBottom: 20, border: "1px solid var(--accent-light)", background: "var(--primary-light)", padding: 16 }}>
+            <h4 style={{ marginTop: 0, fontSize: "1rem", fontWeight: 700, color: "var(--accent-dark)" }}>Edit Category</h4>
+            <div className="toolbar" style={{ display: "grid", gap: 12 }}>
+              <div style={{ display: "grid", gap: 4 }}>
+                <span style={{ fontSize: "0.8rem", fontWeight: 600, color: "var(--muted)" }}>Name</span>
+                <input
+                  placeholder="Name"
+                  value={editForm.name}
+                  onChange={(e) => setEditForm((f) => ({ ...f, name: e.target.value }))}
+                />
+              </div>
+              <div style={{ display: "grid", gap: 4 }}>
+                <span style={{ fontSize: "0.8rem", fontWeight: 600, color: "var(--muted)" }}>Slug</span>
+                <input
+                  placeholder="Slug"
+                  value={editForm.slug}
+                  onChange={(e) => setEditForm((f) => ({ ...f, slug: e.target.value }))}
+                />
+              </div>
+
+              <div className="card" style={{ padding: 12, background: "rgba(255,255,255,0.5)" }}>
+                <div style={{ marginBottom: 8, fontWeight: 700, fontSize: "0.8rem" }}>Color Palette</div>
+                <div className="toolbar" style={{ gap: 6 }}>
                   {COLOR_PRESETS.map((color) => {
                     const selected = editForm.color.toLowerCase() === color.toLowerCase();
                     return (
@@ -286,53 +308,46 @@ export function CategoriesManager({ categories }: { categories: CategoryRow[] })
                         aria-label={`Select color ${color}`}
                         onClick={() => setEditForm((f) => ({ ...f, color }))}
                         style={{
-                          width: 28,
-                          height: 28,
-                          borderRadius: 999,
-                          border: selected ? "2px solid #1d1b16" : "1px solid #ded4c2",
+                          width: 24,
+                          height: 24,
+                          borderRadius: "4px",
+                          border: "none",
                           background: color,
                           cursor: "pointer",
-                          padding: 0
+                          padding: 0,
+                          boxShadow: selected ? `0 0 0 2px white, 0 0 0 3px ${color}` : "var(--shadow-sm)"
                         }}
                       />
                     );
                   })}
                   <input
                     type="color"
-                    value={/^#([0-9a-f]{6})$/i.test(editForm.color) ? editForm.color : "#d56f36"}
+                    value={/^#([0-9a-f]{6})$/i.test(editForm.color) ? editForm.color : "#6366f1"}
                     onChange={(e) => setEditForm((f) => ({ ...f, color: e.target.value }))}
                     title="Custom color"
                     style={{
-                      width: 40,
-                      height: 28,
-                      border: "1px solid #ded4c2",
-                      borderRadius: 8,
-                      padding: 2,
-                      background: "#fff"
+                      width: 32,
+                      height: 24,
+                      border: "1px solid var(--line)",
+                      borderRadius: "4px",
+                      padding: 0,
+                      background: "none"
                     }}
                   />
                 </div>
-                <div style={{ marginTop: 8, display: "flex", gap: 8, alignItems: "center" }}>
-                  <span className="muted">Preview:</span>
-                  <span
-                    className="badge"
-                    style={{
-                      borderColor: editForm.color || "#ded4c2",
-                      background: editForm.color ? `${editForm.color}22` : undefined
-                    }}
-                  >
-                    {editForm.color || "No color selected"}
-                  </span>
-                </div>
               </div>
-              <input
-                placeholder="Icon"
-                value={editForm.icon}
-                onChange={(e) => setEditForm((f) => ({ ...f, icon: e.target.value }))}
-              />
-              <div className="toolbar">
+
+              <div style={{ display: "grid", gap: 4 }}>
+                <span style={{ fontSize: "0.8rem", fontWeight: 600, color: "var(--muted)" }}>Icon</span>
+                <input
+                  placeholder="Icon"
+                  value={editForm.icon}
+                  onChange={(e) => setEditForm((f) => ({ ...f, icon: e.target.value }))}
+                />
+              </div>
+              <div className="toolbar" style={{ marginTop: 8 }}>
                 <button className="button" type="button" disabled={isPending} onClick={saveEdit}>
-                  {isPending && pendingAction === "edit" ? "Saving..." : "Save"}
+                  {isPending && pendingAction === "edit" ? "Saving..." : "Save Changes"}
                 </button>
                 <button
                   className="button secondary"
@@ -348,7 +363,7 @@ export function CategoriesManager({ categories }: { categories: CategoryRow[] })
         ) : null}
 
         <div className="table-wrap">
-          <table>
+          <table className="mobile-stack-table">
             <thead>
               <tr>
                 <th>Name</th>
@@ -361,28 +376,33 @@ export function CategoriesManager({ categories }: { categories: CategoryRow[] })
             <tbody>
               {pagedCategories.map((c) => (
                 <tr key={c.id}>
-                  <td>{c.name}</td>
-                  <td>{c.slug}</td>
-                  <td>
+                  <td data-label="Name" style={{ fontWeight: 600, color: "var(--ink)" }}>{c.name}</td>
+                  <td data-label="Slug" className="muted" style={{ fontFamily: "monospace", fontSize: "0.85rem" }}>{c.slug}</td>
+                  <td data-label="Color">
                     <button
                       type="button"
-                      className="button secondary"
+                      className="text-link-btn"
                       title="Quick change color"
-                      style={{ padding: "2px 8px" }}
                       onClick={(event) => openQuickColorPicker(event, c)}
                     >
-                      <span className="badge" style={{ borderColor: c.color ?? undefined }}>
-                        {c.color ?? "-"}
+                      <span className="badge" style={{
+                        color: c.color ?? "var(--muted)",
+                        borderColor: c.color ?? "var(--line)",
+                        background: c.color ? `${c.color}10` : "transparent",
+                        fontWeight: 600,
+                        fontSize: "0.75rem"
+                      }}>
+                        {c.color ?? "No Color"}
                       </span>
                     </button>
                   </td>
-                  <td>{c.icon ?? "-"}</td>
-                  <td>
-                    <div className="toolbar" style={{ gap: 6 }}>
+                  <td data-label="Icon" style={{ fontSize: "1.2rem" }}>{c.icon ?? "-"}</td>
+                  <td data-label="Action">
+                    <div className="toolbar" style={{ gap: 8, justifyContent: 'flex-end' }}>
                       <button
                         className="button secondary"
                         type="button"
-                        style={{ padding: "6px 10px" }}
+                        style={{ padding: "6px 12px", fontSize: "0.85rem" }}
                         onClick={() => openEdit(c)}
                       >
                         Edit
@@ -426,20 +446,24 @@ export function CategoriesManager({ categories }: { categories: CategoryRow[] })
                   disabled={safePage <= 1}
                   onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
                   aria-label="Previous page"
-                  style={{ minWidth: 38, padding: "6px 10px" }}
+                  style={{ minWidth: 36, padding: "6px", height: 36, borderRadius: "50%" }}
                 >
-                  <ChevronLeftIcon aria-hidden="true" width={16} height={16} />
+                  <ChevronLeftIcon aria-hidden="true" width={18} height={18} />
                 </button>
-                <span className="badge">{safePage}/{totalPages}</span>
+                <div style={{ fontWeight: 600, fontSize: "0.9rem", color: "var(--ink)" }}>
+                  <span style={{ color: "var(--primary)" }}>{safePage}</span>
+                  <span style={{ margin: "0 4px", color: "var(--muted)", fontWeight: 400 }}>/</span>
+                  <span>{totalPages}</span>
+                </div>
                 <button
                   type="button"
                   className="button secondary"
                   disabled={safePage >= totalPages}
                   onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
                   aria-label="Next page"
-                  style={{ minWidth: 38, padding: "6px 10px" }}
+                  style={{ minWidth: 36, padding: "6px", height: 36, borderRadius: "50%" }}
                 >
-                  <ChevronRightIcon aria-hidden="true" width={16} height={16} />
+                  <ChevronRightIcon aria-hidden="true" width={18} height={18} />
                 </button>
               </div>
             ) : null}
@@ -517,6 +541,6 @@ export function CategoriesManager({ categories }: { categories: CategoryRow[] })
           </section>
         </div>
       ) : null}
-    </section>
+    </div>
   );
 }
