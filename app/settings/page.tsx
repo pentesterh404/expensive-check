@@ -29,9 +29,8 @@ export default async function SettingsPage() {
 
   return (
     <AppShell showTopbar title="Settings" subtitle="Manage your account and integrations">
-      <div className="settings-page">
+      <div className={isAdmin ? "settings-page settings-masonry" : "settings-page settings-grid"}>
 
-        {/* Masonry Layout: Profile + Telegram + Admin + Health */}
         <AccountProfileForm user={user} />
         <TelegramLinkPanel botUsername={botUsername} isAdmin={isAdmin} />
 
@@ -40,7 +39,7 @@ export default async function SettingsPage() {
             {/* Admin Console */}
             <section className="s-card">
               <div className="s-card-head">
-                <h2 className="s-title">Admin Console</h2>
+                <h2 className="s-title" id="admin-console-title">Admin Console</h2>
                 <p className="s-subtitle">Database tools and runtime configuration</p>
               </div>
 

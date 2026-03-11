@@ -2150,31 +2150,52 @@ tbody tr:hover {
   }
 }
 
-/* -- Settings masonry layout -- */
+/* -- Settings page layout -- */
 .settings-page {
   padding: 0 0 80px;
+}
+
+.settings-masonry {
   column-count: 2;
   column-gap: 28px;
 }
 
+.settings-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(400px, 1fr));
+  gap: 28px;
+  align-items: start;
+}
+
 @media (max-width: 1100px) {
-  .settings-page {
+  .settings-masonry {
     column-count: 1;
   }
 }
 
+@media (max-width: 640px) {
+  .settings-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
 .s-card {
-  display: inline-block;
-  /* Required for masonry flow */
   width: 100%;
-  margin-bottom: 28px;
   background: var(--panel-solid);
   border: 1px solid var(--line);
   border-radius: var(--radius-xl);
   padding: 36px;
   box-shadow: var(--shadow-sm);
+  margin-bottom: 28px;
+}
+
+.settings-masonry .s-card {
+  display: inline-block;
   break-inside: avoid;
-  /* Prevent card from breaking across columns */
+}
+
+.settings-grid .s-card {
+  margin-bottom: 0;
 }
 
 @media (max-width: 640px) {
