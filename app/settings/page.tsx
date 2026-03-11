@@ -1,143 +1,104 @@
 import Link from "next/link";
 import { AppShell } from "@/components/AppShell";
 import { TelegramLinkPanel } from "@/components/TelegramLinkPanel";
-import { UserMenu } from "@/components/UserMenu";
 import { AdminDbTransferPanel } from "@/components/AdminDbTransferPanel";
 import { AdminRuntimeConfigPanel } from "@/components/AdminRuntimeConfigPanel";
+import { AccountProfileForm } from "@/components/AccountProfileForm";
 import { getSessionUser } from "@/lib/auth/session";
 import { isAdminEmail } from "@/lib/auth/roles";
 import { getRuntimeConfig } from "@/lib/server/runtime-config";
+import { redirect } from "next/navigation";
 
 export default async function SettingsPage() {
   const user = await getSessionUser();
-  const isAdmin = isAdminEmail(user?.email);
-  const runtimeConfig = getRuntimeConfig();
-  const telegramBotUsername = runtimeConfig.TELEGRAM_BOT_USERNAME || null;
+  if (!user) redirect("/login");
+
+  const isAdmin = isAdminEmail(user.email);
+  const rc = getRuntimeConfig();
+  const botUsername = rc.TELEGRAM_BOT_USERNAME || null;
+
   const envChecks = [
-    {
-      key: "DATABASE_URL",
-      present: Boolean(process.env.DATABASE_URL),
-      note: "Required for Prisma/Postgres access"
-    },
-    {
-      key: "JWT_SECRET",
-      present: Boolean(process.env.JWT_SECRET),
-      note: "Required for login/session validation"
-    },
-    {
-      key: "TELEGRAM_BOT_TOKEN",
-      present: Boolean(runtimeConfig.TELEGRAM_BOT_TOKEN),
-      note: "Required for bot replies and Telegram API calls"
-    },
-    {
-      key: "TELEGRAM_BOT_USERNAME",
-      present: Boolean(runtimeConfig.TELEGRAM_BOT_USERNAME),
-      note: "Used to build direct Telegram link for /link command"
-    },
-    {
-      key: "TELEGRAM_WEBHOOK_SECRET",
-      present: Boolean(process.env.TELEGRAM_WEBHOOK_SECRET),
-      note: "Required for webhook endpoint validation"
-    },
-    {
-      key: "NEXT_PUBLIC_BASE_URL",
-      present: Boolean(runtimeConfig.NEXT_PUBLIC_BASE_URL),
-      note: "Used for setup/docs and public app base URL"
-    }
+    { key: "DATABASE_URL", ok: !!process.env.DATABASE_URL, note: "Primary data storage" },
+    { key: "JWT_SECRET", ok: !!process.env.JWT_SECRET, note: "Auth & sessions" },
+    { key: "TELEGRAM_BOT_TOKEN", ok: !!rc.TELEGRAM_BOT_TOKEN, note: "Bot communication" },
+    { key: "TELEGRAM_BOT_USERNAME", ok: !!rc.TELEGRAM_BOT_USERNAME, note: "Account linking" },
+    { key: "TELEGRAM_WEBHOOK_SECRET", ok: !!process.env.TELEGRAM_WEBHOOK_SECRET, note: "Webhook security" },
+    { key: "NEXT_PUBLIC_BASE_URL", ok: !!rc.NEXT_PUBLIC_BASE_URL, note: "Public endpoint" },
   ];
-  const missingCount = envChecks.filter((e) => !e.present).length;
+  const missing = envChecks.filter((e) => !e.ok).length;
 
   return (
-    <AppShell showTopbar={false}>
-      <div className="page">
-        <section className="hero">
-          <div className="hero-head">
-            <div>
-              <h1>Settings</h1>
-              <p>
-                {isAdmin
-                  ? "Configure Telegram linking and admin environment shortcuts."
-                  : "Configure Telegram linking for your expense tracker."}
-              </p>
-            </div>
-            <UserMenu user={user} />
-          </div>
-        </section>
+    <AppShell showTopbar title="Settings" subtitle="Manage your account and integrations">
+      <div className="settings-page">
 
-        <section className={`grid ${isAdmin ? "cols-2" : "cols-1"}`}>
-          <TelegramLinkPanel botUsername={telegramBotUsername} isAdmin={isAdmin} />
-          {isAdmin ? (
-            <div className="card">
-              <h3 style={{ marginTop: 0 }}>Admin Tools</h3>
-              <div className="toolbar" style={{ marginTop: 12 }}>
-                <Link href="/user-manager" className="button secondary">
-                  Open User Manager
-                </Link>
+        {/* Masonry Layout: Profile + Telegram + Admin + Health */}
+        <AccountProfileForm user={user} />
+        <TelegramLinkPanel botUsername={botUsername} isAdmin={isAdmin} />
+
+        {isAdmin && (
+          <>
+            {/* Admin Console */}
+            <section className="s-card">
+              <div className="s-card-head">
+                <h2 className="s-title">Admin Console</h2>
+                <p className="s-subtitle">Database tools and runtime configuration</p>
               </div>
+
+              <Link
+                href="/user-manager"
+                className="s-banner"
+                style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 28, textDecoration: "none" }}
+              >
+                <div>
+                  <span style={{ fontWeight: 600, fontSize: "0.9rem", color: "var(--primary)" }}>User Management →</span>
+                  <span style={{ display: "block", fontSize: "0.8rem", color: "var(--muted)", marginTop: 2 }}>View and manage user accounts</span>
+                </div>
+              </Link>
 
               <AdminDbTransferPanel />
+              <div style={{ margin: "28px 0", borderTop: "1px solid var(--line)" }} />
               <AdminRuntimeConfigPanel />
+            </section>
 
-              <div className="card" style={{ marginTop: 14 }}>
-                <div
-                  style={{
-                    display: "flex",
-                    justifyContent: "space-between",
-                    alignItems: "center",
-                    gap: 10,
-                    marginBottom: 8
-                  }}
-                >
-                  <h4 style={{ margin: 0 }}>Environment Health</h4>
-                  <span
-                    className="badge"
-                    style={{
-                      borderColor: missingCount === 0 ? "#86efac" : "#fdba74",
-                      color: missingCount === 0 ? "#166534" : "#9a3412",
-                      background: missingCount === 0 ? "#f0fdf4" : "#fff7ed"
-                    }}
-                  >
-                    {missingCount === 0 ? "All Required Variables Present" : `${missingCount} Missing`}
-                  </span>
+            {/* System Health */}
+            <section className="s-card">
+              <div className="s-card-head" style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 12 }}>
+                <div>
+                  <h2 className="s-title">System Health</h2>
+                  <p className="s-subtitle">Environment variable status</p>
                 </div>
-                <div className="table-wrap">
-                  <table>
-                    <thead>
-                      <tr>
-                        <th>Variable</th>
-                        <th>Status</th>
-                        <th>Impact</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {envChecks.map((item) => (
-                        <tr key={item.key}>
-                          <td><code>{item.key}</code></td>
-                          <td>
-                            <span
-                              className="badge"
-                              style={{
-                                borderColor: item.present ? "#86efac" : "#fca5a5",
-                                color: item.present ? "#166534" : "#991b1b",
-                                background: item.present ? "#f0fdf4" : "#fef2f2"
-                              }}
-                            >
-                              {item.present ? "Present" : "Missing"}
-                            </span>
-                          </td>
-                          <td className="muted">{item.note}</td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-                <p className="muted" style={{ marginBottom: 0, marginTop: 8 }}>
-                  This panel checks presence only and never reveals secret values.
-                </p>
+                <span className={`s-pill ${missing === 0 ? "s-pill--ok" : "s-pill--warn"}`}>
+                  {missing === 0 ? "All Systems Go" : `${missing} Missing`}
+                </span>
               </div>
-            </div>
-          ) : null}
-        </section>
+
+              <div className="s-table-wrap">
+                <table className="s-table mobile-stack-table">
+                  <thead>
+                    <tr>
+                      <th>Variable</th>
+                      <th>Status</th>
+                      <th>Purpose</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {envChecks.map((v) => (
+                      <tr key={v.key}>
+                        <td data-label="Variable"><code>{v.key}</code></td>
+                        <td data-label="Status">
+                          <span className={`s-pill s-pill--sm ${v.ok ? "s-pill--ok" : "s-pill--err"}`}>
+                            {v.ok ? "Active" : "Missing"}
+                          </span>
+                        </td>
+                        <td data-label="Purpose" className="muted">{v.note}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </section>
+          </>
+        )}
       </div>
     </AppShell>
   );

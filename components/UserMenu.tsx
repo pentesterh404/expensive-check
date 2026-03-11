@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useState, useTransition } from "react";
+import { createPortal } from "react-dom";
 import { BellIcon } from "@heroicons/react/24/outline";
 
 type SessionUser = {
@@ -231,7 +232,7 @@ export function UserMenu({ user }: { user: SessionUser }) {
                 >
                   <div className="notif-title-row">
                     {isUnreadItem(item) ? <span className="notif-new-dot" title="New notification" /> : null}
-                    <div className="notif-title">
+                    <div className="notif-title" style={{ fontWeight: isUnreadItem(item) ? 600 : 400, color: isUnreadItem(item) ? "var(--ink)" : "var(--muted)" }}>
                       {item.message || item.expense?.description || item.text || "Telegram message"}
                     </div>
                   </div>
@@ -275,7 +276,7 @@ export function UserMenu({ user }: { user: SessionUser }) {
         </div>
       </div>
 
-      {activeItem && activeItem.expense ? (
+      {typeof document !== "undefined" && activeItem && activeItem.expense ? createPortal(
         <div
           role="dialog"
           aria-modal="true"
@@ -283,8 +284,10 @@ export function UserMenu({ user }: { user: SessionUser }) {
           style={{
             position: "fixed",
             inset: 0,
-            background: "rgba(0, 0, 0, 0.35)",
-            zIndex: 90,
+            background: "rgba(15, 23, 42, 0.5)",
+            backdropFilter: "blur(4px)",
+            WebkitBackdropFilter: "blur(4px)",
+            zIndex: 2000,
             display: "flex",
             alignItems: "center",
             justifyContent: "center",
@@ -350,7 +353,8 @@ export function UserMenu({ user }: { user: SessionUser }) {
               </button>
             </div>
           </section>
-        </div>
+        </div>,
+        document.body
       ) : null}
     </div>
   );

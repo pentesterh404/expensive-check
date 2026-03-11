@@ -45,11 +45,22 @@ All notable changes to this project will be documented in this file.
 - User Details modal action layout updated: `Close` moved to bottom-right.
 
 ### Fixed
+
 - Fixed `db-export-pgdump` response typing issue for Next.js build.
 - Hardened Telegram ingest flow so unlinked chats cannot create expenses.
 - Improved Telegram bot reply reliability with clearer failure logging and retry behavior.
 - Telegram unlinked users now receive link guidance message with `{web}/settings`.
 - Parsing of tag-only expense inputs now avoids leaking category tag prefix into description.
+
+### UI / UX
+
+- **Notifications:** Redesigned notification dropdown in topbar — badge count is now always visible and properly styled; notification detail modal uses React Portal with backdrop blur and correct z-index stacking.
+- **Dashboard:** Full mobile responsiveness — metric cards and chart sections stack to a single column on screens ≤ 768px; charts adapt legend and pie layout based on viewport width; removed horizontal overflow.
+- **Expenses:** Search bar and filter controls now wrap correctly on mobile (search icon stays inside the input, not on a separate line).
+- **User Manager:** Toolbar search/filter layout wraps naturally on small screens; user detail modal uses React Portal and centers properly.
+- **Categories:** Redesigned to a two-column masonry layout matching `/settings` style (`s-card` sections, `s-title`/`s-subtitle` headers). Color Identity swatches now flow horizontally and wrap to the next row when space is limited. Edit action replaced with a centered modal popup (same style as Delete confirmation). Delete confirmation popup now centers correctly on mobile.
+- **Settings — Telegram:** "Generate Link Code" section switches from a fixed two-column grid to a responsive single-column layout on mobile (`settings-row` class).
+- **Global CSS:** Added `@media (max-width: 768px)` overrides for dashboard grid layouts, main content padding, and card/hero spacing. Tables marked with `mobile-stack-table` display as stacked label/value pairs on mobile instead of scrolling horizontally.
 
 ## [0.2.0] - 2026-02-27
 

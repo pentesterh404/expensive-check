@@ -1,10 +1,6 @@
 export function StatusBadge({ status }: { status: string }) {
-  const cls =
-    status === "CONFIRMED"
-      ? "badge confirmed"
-      : status === "UNPARSED"
-        ? "badge unparsed"
-        : "badge review";
+  const s = status.toLowerCase();
+  const cls = `status-badge status-badge-${s}`;
 
-  return <span className={cls}>{status}</span>;
+  return <span className={cls}>{status.replace("_", " ")}</span>;
 }

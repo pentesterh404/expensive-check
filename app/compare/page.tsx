@@ -1,6 +1,5 @@
 import { AppShell } from "@/components/AppShell";
 import { CompareMonthsChart } from "@/components/CompareMonthsChart";
-import { UserMenu } from "@/components/UserMenu";
 import { getSessionUser } from "@/lib/auth/session";
 import { prisma } from "@/lib/db";
 
@@ -59,7 +58,7 @@ function formatCurrency(value: number) {
 export default async function ComparePage({
   searchParams
 }: {
-  searchParams?: Promise<Record<string, string | string[] | undefined>>;
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
   const sp = (await searchParams) ?? {};
   const now = new Date();
@@ -68,47 +67,52 @@ export default async function ComparePage({
 
   const requestedLeftMonth = parseMonthParam(typeof sp.left === "string" ? sp.left : undefined, prev);
   const requestedRightMonth = parseMonthParam(typeof sp.right === "string" ? sp.right : undefined, now);
+
   const earliestExpense = user
     ? await prisma.expense.findFirst({
-        where: {
-          userId: user.id,
-          deletedAt: null,
-          status: { not: "DELETED" }
-        },
-        orderBy: { expenseDate: "asc" },
-        select: { expenseDate: true }
-      })
+      where: {
+        userId: user.id,
+        deletedAt: null,
+        status: { not: "DELETED" }
+      },
+      orderBy: { expenseDate: "asc" },
+      select: { expenseDate: true }
+    })
     : null;
+
   const fallbackStart = new Date(now.getFullYear(), now.getMonth() - 11, 1);
   const monthOptions = buildMonthOptionsFromStart(earliestExpense?.expenseDate ?? fallbackStart, now);
   const optionValueSet = new Set(monthOptions.map((option) => option.value));
+
   const rightMonth = optionValueSet.has(requestedRightMonth)
     ? requestedRightMonth
     : (monthOptions[0]?.value ?? monthInputValue(now));
+
   const leftMonthDefault = monthOptions[1]?.value ?? monthOptions[0]?.value ?? monthInputValue(prev);
   const leftMonth = optionValueSet.has(requestedLeftMonth) ? requestedLeftMonth : leftMonthDefault;
+
   const leftRange = monthRange(leftMonth);
   const rightRange = monthRange(rightMonth);
 
   const expenses = user
     ? await prisma.expense.findMany({
-        where: {
-          userId: user.id,
-          deletedAt: null,
-          status: { not: "DELETED" },
-          OR: [
-            { expenseDate: { gte: leftRange.start, lt: leftRange.end } },
-            { expenseDate: { gte: rightRange.start, lt: rightRange.end } }
-          ]
-        },
-        select: {
-          amount: true,
-          expenseDate: true,
-          category: {
-            select: { name: true, color: true }
-          }
+      where: {
+        userId: user.id,
+        deletedAt: null,
+        status: { not: "DELETED" },
+        OR: [
+          { expenseDate: { gte: leftRange.start, lt: leftRange.end } },
+          { expenseDate: { gte: rightRange.start, lt: rightRange.end } }
+        ]
+      },
+      select: {
+        amount: true,
+        expenseDate: true,
+        category: {
+          select: { name: true, color: true }
         }
-      })
+      }
+    })
     : [];
 
   const leftKey = `${leftRange.start.getFullYear()}-${leftRange.start.getMonth()}`;
@@ -146,10 +150,12 @@ export default async function ComparePage({
   const rows = [...rowsMap.values()].sort(
     (a, b) => Math.max(b.leftTotal, b.rightTotal) - Math.max(a.leftTotal, a.rightTotal)
   );
+
   const delta = rightTotal - leftTotal;
   const deltaPct = leftTotal > 0 ? (delta / leftTotal) * 100 : rightTotal > 0 ? 100 : 0;
   const leftLabel = monthLabel(leftMonth);
   const rightLabel = monthLabel(rightMonth);
+
   const chartData = rows.map((row) => ({
     category: row.name,
     leftTotal: row.leftTotal,
@@ -157,18 +163,12 @@ export default async function ComparePage({
   }));
 
   return (
-    <AppShell showTopbar={false}>
-      <div className="page">
-        <section className="hero">
-          <div className="hero-head">
-            <div>
-              <h1>Compare Months</h1>
-              <p>Compare total spending and category changes between two months.</p>
-            </div>
-            <UserMenu user={user} />
-          </div>
-        </section>
-
+    <AppShell
+      showTopbar={true}
+      title="Trend Analysis"
+      subtitle="Compare spending across time periods"
+    >
+      <div className="page" style={{ gap: 20 }}>
         <section className="card">
           <form className="compare-form" method="GET">
             <label>
@@ -220,7 +220,7 @@ export default async function ComparePage({
           </div>
         </section>
 
-        <section className={`card compare-chart-card ${rows.length === 0 ? "compare-chart-card-empty" : ""}`}>
+        <section className={`card chart-card compare-chart-card ${rows.length === 0 ? "compare-chart-card-empty" : ""}`}>
           <div className="chart-head">
             <h3>Category Comparison</h3>
             <span className="muted">Grouped vertical bars by category</span>
@@ -245,7 +245,7 @@ export default async function ComparePage({
             <p className="muted">No expenses in selected months.</p>
           ) : (
             <div className="table-wrap">
-              <table>
+              <table className="mobile-stack-table">
                 <thead>
                   <tr>
                     <th>Category</th>
@@ -259,15 +259,15 @@ export default async function ComparePage({
                     const diff = row.rightTotal - row.leftTotal;
                     return (
                       <tr key={row.name}>
-                        <td>
+                        <td data-label="Category">
                           <span style={{ display: "inline-flex", alignItems: "center", gap: 8 }}>
                             <span className="compare-dot" style={{ background: row.color ?? "#d56f36" }} />
                             {row.name}
                           </span>
                         </td>
-                        <td>{formatCurrency(row.leftTotal)}</td>
-                        <td>{formatCurrency(row.rightTotal)}</td>
-                        <td className={diff >= 0 ? "compare-up" : "compare-down"}>
+                        <td data-label={leftLabel}>{formatCurrency(row.leftTotal)}</td>
+                        <td data-label={rightLabel}>{formatCurrency(row.rightTotal)}</td>
+                        <td data-label="Delta" className={diff >= 0 ? "compare-up" : "compare-down"}>
                           {diff >= 0 ? "+" : "-"}{formatCurrency(Math.abs(diff))}
                         </td>
                       </tr>

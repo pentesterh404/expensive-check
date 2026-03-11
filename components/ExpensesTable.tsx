@@ -1,11 +1,13 @@
 "use client";
 
-import { useMemo, useState, useTransition, type MouseEvent } from "react";
+import { useEffect, useMemo, useState, useTransition, type MouseEvent } from "react";
+import { createPortal } from "react-dom";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
-import { ChevronLeftIcon, ChevronRightIcon } from "@heroicons/react/24/outline";
+import { ChevronLeftIcon, ChevronRightIcon, FunnelIcon } from "@heroicons/react/24/outline";
 import { StatusBadge } from "@/components/StatusBadge";
 import { DeleteExpenseButton } from "@/components/DeleteExpenseButton";
 import { useToast } from "@/components/ToastProvider";
+import { ConfirmDialog } from "@/components/ConfirmDialog";
 
 type ExpenseRow = {
   id: string;
@@ -88,11 +90,20 @@ export function ExpensesTable({
   const [quickDescriptionSaving, setQuickDescriptionSaving] = useState(false);
   const [descriptionDialogExpenseId, setDescriptionDialogExpenseId] = useState<string | null>(null);
   const [descriptionDialogValue, setDescriptionDialogValue] = useState("");
+  const [showBulkDeleteConfirm, setShowBulkDeleteConfirm] = useState(false);
   const [isPending, startTransition] = useTransition();
+
   const activeExpense = rows.find((row) => row.id === activeExpenseId) ?? null;
   const isAnyQuickSaving =
     quickCategorySaving || quickWalletSaving || quickStatusSaving || quickDescriptionSaving;
   const { showToast } = useToast();
+
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+
+
 
   const categoryIdBySlug = useMemo(
     () =>
@@ -178,7 +189,11 @@ export function ExpensesTable({
 
   function runBulkDelete() {
     if (selectedIds.length === 0) return;
-    if (!window.confirm(`Delete ${selectedIds.length} selected expenses?`)) return;
+    setShowBulkDeleteConfirm(true);
+  }
+
+  function executeBulkDelete() {
+    setShowBulkDeleteConfirm(false);
     setBulkAction("delete");
     startTransition(async () => {
       try {
@@ -205,10 +220,12 @@ export function ExpensesTable({
   function openQuickCategoryPicker(event: MouseEvent<HTMLButtonElement>, row: ExpenseRow) {
     if (isAnyQuickSaving) return;
     const rect = event.currentTarget.getBoundingClientRect();
-    const maxLeft = Math.max(12, window.innerWidth - 300);
+    const dropdownWidth = 280;
+    const maxLeft = window.innerWidth - dropdownWidth - 24;
+    const centerLeft = rect.left + rect.width / 2 - dropdownWidth / 2;
     setQuickCategoryAnchor({
       top: Math.min(rect.bottom + 8, window.innerHeight - 220),
-      left: Math.max(12, Math.min(rect.left, maxLeft))
+      left: Math.max(12, Math.min(centerLeft, maxLeft))
     });
     setQuickWalletExpenseId(null);
     setQuickWalletAnchor(null);
@@ -248,10 +265,12 @@ export function ExpensesTable({
   function openQuickWalletPicker(event: MouseEvent<HTMLButtonElement>, row: ExpenseRow) {
     if (isAnyQuickSaving) return;
     const rect = event.currentTarget.getBoundingClientRect();
-    const maxLeft = Math.max(12, window.innerWidth - 300);
+    const dropdownWidth = 280;
+    const maxLeft = window.innerWidth - dropdownWidth - 24;
+    const centerLeft = rect.left + rect.width / 2 - dropdownWidth / 2;
     setQuickWalletAnchor({
       top: Math.min(rect.bottom + 8, window.innerHeight - 260),
-      left: Math.max(12, Math.min(rect.left, maxLeft))
+      left: Math.max(12, Math.min(centerLeft, maxLeft))
     });
     setQuickCategoryExpenseId(null);
     setQuickCategoryAnchor(null);
@@ -290,10 +309,12 @@ export function ExpensesTable({
   function openQuickStatusPicker(event: MouseEvent<HTMLButtonElement>, row: ExpenseRow) {
     if (isAnyQuickSaving) return;
     const rect = event.currentTarget.getBoundingClientRect();
-    const maxLeft = Math.max(12, window.innerWidth - 260);
+    const dropdownWidth = 180;
+    const maxLeft = window.innerWidth - dropdownWidth - 24;
+    const centerLeft = rect.left + rect.width / 2 - dropdownWidth / 2;
     setQuickStatusAnchor({
       top: Math.min(rect.bottom + 8, window.innerHeight - 260),
-      left: Math.max(12, Math.min(rect.left, maxLeft))
+      left: Math.max(12, Math.min(centerLeft, maxLeft))
     });
     setQuickCategoryExpenseId(null);
     setQuickCategoryAnchor(null);
@@ -362,85 +383,13 @@ export function ExpensesTable({
     }
   }
 
-  function exportExcel() {
-    const headers = [
-      "Date",
-      "Time",
-      "Bill ID",
-      "Description",
-      "Category",
-      "Tags",
-      "Wallet",
-      "Amount (VND)",
-      "Status"
-    ];
-
-    const bodyRows = rows.map((row) => [
-      row.expenseDate,
-      formatTime(row.receivedAt),
-      row.id,
-      row.description || "-",
-      row.category ?? "-",
-      row.tags.length ? row.tags.map((tag) => `#${tag}`).join(" ") : "-",
-      row.wallet ?? "-",
-      String(Math.round(row.amount)),
-      row.status
-    ]);
-
-    const tableHtml = `
-      <table border="1">
-        <thead>
-          <tr>${headers.map((h) => `<th>${escapeHtml(h)}</th>`).join("")}</tr>
-        </thead>
-        <tbody>
-          ${bodyRows
-            .map(
-              (cells) =>
-                `<tr>${cells.map((cell) => `<td>${escapeHtml(cell)}</td>`).join("")}</tr>`
-            )
-            .join("")}
-        </tbody>
-      </table>
-    `;
-
-    const content = `
-      <html xmlns:o="urn:schemas-microsoft-com:office:office"
-            xmlns:x="urn:schemas-microsoft-com:office:excel"
-            xmlns="http://www.w3.org/TR/REC-html40">
-        <head>
-          <meta charset="UTF-8" />
-        </head>
-        <body>${tableHtml}</body>
-      </html>
-    `;
-
-    const blob = new Blob([`\uFEFF${content}`], {
-      type: "application/vnd.ms-excel;charset=utf-8;"
-    });
-
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = `expenses-${new Date().toISOString().slice(0, 10)}.xls`;
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    URL.revokeObjectURL(url);
-  }
 
   return (
     <div className="card expense-table-card">
-      <div className="toolbar" style={{ marginBottom: 10 }}>
-        <button type="button" className="button secondary" onClick={exportExcel} disabled={rows.length === 0}>
-          Export Excel
-        </button>
-      </div>
-
       {showBulkActions && (
         <div className="review-toolbar">
           <div className="review-toolbar-left">
-            <span className="badge">Review Queue</span>
-            <span className="muted review-selected">{selectedIds.length} selected</span>
+            <span className="muted review-selected">{selectedIds.length} items selected for bulk action</span>
           </div>
           <div className="review-toolbar-actions">
             <button
@@ -463,485 +412,558 @@ export function ExpensesTable({
         </div>
       )}
 
-      {rows.length === 0 ? (
-        <div className="expense-empty">
-          <strong>No expenses found.</strong>
-          <p className="muted" style={{ margin: "6px 0 0" }}>
-            Try changing filters or wait for new Telegram messages.
-          </p>
-        </div>
-      ) : (
-      <div className="table-wrap">
-        <table className="expense-table">
-          <thead>
-            <tr>
-              {showBulkActions && (
-                <th>
-                  <input
-                    type="checkbox"
-                    checked={rows.length > 0 && selectedIds.length === rows.length}
-                    onChange={toggleAll}
-                    aria-label="Select all"
-                  />
-                </th>
-              )}
-              <th>Date</th>
-              <th>Time</th>
-              <th>Bill ID</th>
-              <th>Description</th>
-              <th>Category</th>
-              <th>Wallet</th>
-              <th className="th-right">Amount</th>
-              <th>Status</th>
-              <th>Actions</th>
-            </tr>
-          </thead>
-          <tbody>
-            {rows.map((e) => {
-              return (
-                <tr key={e.id}>
+      {
+        rows.length === 0 ? (
+          <div className="expense-empty" style={{
+            padding: '60px 24px',
+            textAlign: 'center',
+            background: 'var(--panel-solid)',
+            border: '1px dashed var(--line)',
+            borderRadius: 'var(--radius-md)',
+            margin: '20px 0'
+          }}>
+            <FunnelIcon width={40} height={40} style={{ color: 'var(--muted)', margin: '0 auto 16px', opacity: 0.5 }} />
+            <strong style={{ display: 'block', fontSize: '1.125rem', color: 'var(--ink)' }}>No expenses matched your filters</strong>
+            <p className="muted" style={{ margin: "8px 0 0", fontSize: '0.875rem' }}>
+              Try adjusting your search terms or date range, or wait for new transactions to sync.
+            </p>
+          </div>
+        ) : (
+          <div className="table-wrap">
+            <table className="expense-table">
+              <thead>
+                <tr>
                   {showBulkActions && (
-                    <td>
+                    <th>
                       <input
                         type="checkbox"
-                        checked={selectedIds.includes(e.id)}
-                        onChange={() => toggleSelected(e.id)}
-                        aria-label={`Select ${e.description}`}
+                        checked={rows.length > 0 && selectedIds.length === rows.length}
+                        onChange={toggleAll}
+                        aria-label="Select all"
                       />
-                    </td>
+                    </th>
                   )}
-                  <td>{e.expenseDate}</td>
-                  <td>{formatTime(e.receivedAt)}</td>
-                  <td>
-                    <button
-                      className="text-link-btn"
-                      type="button"
-                      onClick={() => openExpenseModal(e)}
-                      title="Open bill details"
-                    >
-                      {e.id}
-                    </button>
-                  </td>
-                  <td>
-                    <button
-                      type="button"
-                      className="text-link-btn"
-                      title="Quick change description"
-                      onClick={() => openQuickDescriptionDialog(e)}
-                    >
-                      {e.description || "-"}
-                    </button>
-                  </td>
-                  <td>
-                    <button
-                      type="button"
-                      className="text-link-btn"
-                      title="Quick change category"
-                      onClick={(event) => openQuickCategoryPicker(event, e)}
-                    >
-                      {e.category ?? "Uncategorized"}
-                    </button>
-                  </td>
-                  <td>
-                    <button
-                      type="button"
-                      className="text-link-btn"
-                      title="Quick change wallet"
-                      onClick={(event) => openQuickWalletPicker(event, e)}
-                    >
-                      {e.wallet ?? "-"}
-                    </button>
-                  </td>
-                  <td className="td-right">{formatCurrency(e.amount)}</td>
-                  <td>
-                    <button
-                      type="button"
-                      className="text-link-btn"
-                      title="Quick change status"
-                      onClick={(event) => openQuickStatusPicker(event, e)}
-                    >
-                      <StatusBadge status={e.status} />
-                    </button>
-                  </td>
-                  <td>
-                    <div className="row-actions">
-                      <DeleteExpenseButton expenseId={e.id} />
-                    </div>
-                  </td>
+                  <th>Date</th>
+                  <th>Time</th>
+                  <th>Bill ID</th>
+                  <th>Description</th>
+                  <th>Category</th>
+                  <th>Wallet</th>
+                  <th className="th-right">Amount</th>
+                  <th>Status</th>
+                  <th>Actions</th>
                 </tr>
-              );
-            })}
-          </tbody>
-        </table>
-      </div>
-      )}
-      <div
-        className="toolbar"
-        style={{
-          marginTop: 12,
-          justifyContent: "space-between",
-          alignItems: "center",
-          padding: 8,
-          border: "1px solid #ded4c2",
-          borderRadius: 10,
-          background: "#f7f3ea"
-        }}
-      >
-        <span className="muted">
-          Showing {rangeStart}-{rangeEnd} / {totalCount}
-        </span>
-        {totalPages > 1 ? (
-          <div className="toolbar" style={{ gap: 8 }}>
-            <button
-              type="button"
-              className="button secondary"
-              disabled={currentPage <= 1}
-              onClick={() => router.push(pageHref(currentPage - 1) as any)}
-              aria-label="Previous page"
-              style={{ minWidth: 38, padding: "6px 10px" }}
-            >
-              <ChevronLeftIcon aria-hidden="true" width={16} height={16} />
-            </button>
-            <span className="badge">{currentPage}/{totalPages}</span>
-            <button
-              type="button"
-              className="button secondary"
-              disabled={currentPage >= totalPages}
-              onClick={() => router.push(pageHref(currentPage + 1) as any)}
-              aria-label="Next page"
-              style={{ minWidth: 38, padding: "6px 10px" }}
-            >
-              <ChevronRightIcon aria-hidden="true" width={16} height={16} />
-            </button>
+              </thead>
+              <tbody>
+                {rows.map((e) => {
+                  return (
+                    <tr key={e.id}>
+                      {showBulkActions && (
+                        <td>
+                          <input
+                            type="checkbox"
+                            checked={selectedIds.includes(e.id)}
+                            onChange={() => toggleSelected(e.id)}
+                            aria-label={`Select ${e.description}`}
+                          />
+                        </td>
+                      )}
+                      <td>{e.expenseDate}</td>
+                      <td>{formatTime(e.receivedAt)}</td>
+                      <td>
+                        <button
+                          className="text-link-btn"
+                          type="button"
+                          onClick={() => openExpenseModal(e)}
+                          title="Open bill details"
+                        >
+                          {e.id}
+                        </button>
+                      </td>
+                      <td>
+                        <button
+                          type="button"
+                          className="text-link-btn"
+                          title="Quick change description"
+                          onClick={() => openQuickDescriptionDialog(e)}
+                        >
+                          {e.description || "-"}
+                        </button>
+                      </td>
+                      <td>
+                        <button
+                          type="button"
+                          className="text-link-btn"
+                          title="Quick change category"
+                          onClick={(event) => openQuickCategoryPicker(event, e)}
+                        >
+                          {e.category ?? "Uncategorized"}
+                        </button>
+                      </td>
+                      <td>
+                        <button
+                          type="button"
+                          className="text-link-btn"
+                          title="Quick change wallet"
+                          onClick={(event) => openQuickWalletPicker(event, e)}
+                        >
+                          {e.wallet ?? "-"}
+                        </button>
+                      </td>
+                      <td className="td-right">{formatCurrency(e.amount)}</td>
+                      <td>
+                        <button
+                          type="button"
+                          className="text-link-btn"
+                          title="Quick change status"
+                          onClick={(event) => openQuickStatusPicker(event, e)}
+                        >
+                          <StatusBadge status={e.status} />
+                        </button>
+                      </td>
+                      <td>
+                        <div className="row-actions">
+                          <DeleteExpenseButton expenseId={e.id} />
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
           </div>
-        ) : null}
-      </div>
-
-      {activeExpense && (
-        <div
-          role="dialog"
-          aria-modal="true"
-          onClick={() => {
-            setActiveExpenseId(null);
-          }}
-          style={{
-            position: "fixed",
-            inset: 0,
-            background: "rgba(0, 0, 0, 0.35)",
-            zIndex: 80,
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            padding: 16
-          }}
-        >
-          <section
-            className="card"
-            onClick={(e) => e.stopPropagation()}
-            style={{ width: "min(860px, 100%)", maxHeight: "90vh", overflow: "auto" }}
-          >
-            <div style={{ display: "flex", justifyContent: "space-between", gap: 10, alignItems: "center" }}>
-              <h3 style={{ margin: 0 }}>Bill Details</h3>
-              <StatusBadge status={activeExpense.status} />
+        )
+      }
+      {
+        !rows.length ? null : (
+          <div className="table-footer">
+            <div className="pagination-info">
+              Showing <span>{rangeStart}</span> to <span>{rangeEnd}</span> of <span>{totalCount}</span> expenses
             </div>
 
-            <div className="table-wrap" style={{ marginTop: 10 }}>
-              <table>
-                <tbody>
-                  <tr><th>Bill ID</th><td>{activeExpense.id}</td></tr>
-                  <tr><th>Date</th><td>{activeExpense.expenseDate}</td></tr>
-                  <tr><th>Time</th><td>{formatTime(activeExpense.receivedAt)}</td></tr>
-                  <tr><th>Description</th><td>{activeExpense.description}</td></tr>
-                  <tr><th>Tags</th><td>{activeExpense.tags.length ? activeExpense.tags.map((t) => `#${t}`).join(" ") : "-"}</td></tr>
-                  <tr><th>Wallet</th><td>{activeExpense.wallet ?? "-"}</td></tr>
-                  <tr><th>Amount</th><td>{formatCurrency(activeExpense.amount)}</td></tr>
-                </tbody>
-              </table>
-            </div>
-            <div className="toolbar" style={{ marginTop: 12, justifyContent: "flex-end" }}>
-              <button
-                className="button secondary"
-                type="button"
-                onClick={() => setActiveExpenseId(null)}
-              >
-                Close
-              </button>
-            </div>
-          </section>
-        </div>
-      )}
+            {totalPages > 1 && (
+              <div className="pagination-controls">
+                <button
+                  type="button"
+                  className="button secondary"
+                  disabled={currentPage <= 1}
+                  onClick={() => router.push(pageHref(currentPage - 1) as any)}
+                  aria-label="Previous page"
+                  style={{ width: 36, height: 36, padding: 0 }}
+                >
+                  <ChevronLeftIcon width={16} height={16} />
+                </button>
 
-      {quickCategoryExpenseId && quickCategoryAnchor ? (
-        <div
-          onClick={() => {
-            if (quickCategorySaving) return;
-            setQuickCategoryExpenseId(null);
-            setQuickCategoryAnchor(null);
-          }}
-          style={{ position: "fixed", inset: 0, zIndex: 95 }}
-        >
-          <section
-            className="card"
-            onClick={(event) => event.stopPropagation()}
-            style={{
-              position: "fixed",
-              top: quickCategoryAnchor.top,
-              left: quickCategoryAnchor.left,
-              width: 280,
-              padding: 12
-            }}
-          >
-            <strong style={{ display: "block", marginBottom: 8 }}>Quick Category</strong>
-            <div style={{ display: "grid", gap: 6, maxHeight: 220, overflow: "auto" }}>
-              {categoryOptions.map((c) => {
-                const selected = quickCategorySlug === c.slug;
-                return (
-                  <button
-                    key={c.slug || "uncategorized"}
-                    type="button"
-                    className="button secondary"
-                    disabled={quickCategorySaving}
-                    style={{
-                      justifyContent: "flex-start",
-                      borderColor: selected ? "#1d4ed8" : undefined,
-                      color: selected ? "#1d4ed8" : undefined
-                    }}
-                    onClick={() => {
-                      setQuickCategorySlug(c.slug);
-                      void saveQuickCategory(c.slug);
-                    }}
-                  >
-                    {quickCategorySaving && selected ? "Saving..." : c.name}
-                  </button>
-                );
-              })}
-            </div>
-          </section>
-        </div>
-      ) : null}
+                <div className="page-indicator">
+                  Page {currentPage} of {totalPages}
+                </div>
 
-      {quickWalletExpenseId && quickWalletAnchor ? (
-        <div
-          onClick={() => {
-            if (quickWalletSaving) return;
-            setQuickWalletExpenseId(null);
-            setQuickWalletAnchor(null);
-          }}
-          style={{ position: "fixed", inset: 0, zIndex: 95 }}
-        >
-          <section
-            className="card"
-            onClick={(event) => event.stopPropagation()}
-            style={{
-              position: "fixed",
-              top: quickWalletAnchor.top,
-              left: quickWalletAnchor.left,
-              width: 280,
-              padding: 12
-            }}
-          >
-            <strong style={{ display: "block", marginBottom: 8 }}>Quick Wallet</strong>
-            <div style={{ display: "grid", gap: 6, maxHeight: 220, overflow: "auto" }}>
-              <button
-                type="button"
-                className="button secondary"
-                disabled={quickWalletSaving}
+                <button
+                  type="button"
+                  className="button secondary"
+                  disabled={currentPage >= totalPages}
+                  onClick={() => router.push(pageHref(currentPage + 1) as any)}
+                  aria-label="Next page"
+                  style={{ width: 36, height: 36, padding: 0 }}
+                >
+                  <ChevronRightIcon width={16} height={16} />
+                </button>
+              </div>
+            )}
+          </div>
+        )
+      }
+
+      {
+        mounted && activeExpense && typeof document !== "undefined"
+          ? createPortal(
+            <div
+              role="dialog"
+              aria-modal="true"
+              onClick={() => {
+                setActiveExpenseId(null);
+              }}
+              style={{
+                position: "fixed",
+                inset: 0,
+                background: "rgba(0, 0, 0, 0.35)",
+                zIndex: 9999,
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                padding: 16
+              }}
+            >
+              <section
+                className="card"
+                onClick={(e) => e.stopPropagation()}
                 style={{
-                  justifyContent: "flex-start",
-                  borderColor: quickWalletValue === "" ? "#1d4ed8" : undefined,
-                  color: quickWalletValue === "" ? "#1d4ed8" : undefined
-                }}
-                onClick={() => {
-                  setQuickWalletValue("");
-                  void saveQuickWallet("");
+                  width: "min(860px, 100%)",
+                  maxHeight: "90vh",
+                  overflow: "auto",
+                  animation: "modalIn 0.2s cubic-bezier(0.16, 1, 0.3, 1)"
                 }}
               >
-                {quickWalletSaving && quickWalletValue === "" ? "Saving..." : "No wallet"}
-              </button>
-              {walletOptions.map((wallet) => {
-                const selected = quickWalletValue === wallet;
-                return (
+                <div style={{ display: "flex", justifyContent: "space-between", gap: 10, alignItems: "center" }}>
+                  <h3 style={{ margin: 0 }}>Bill Details</h3>
+                  <StatusBadge status={activeExpense.status} />
+                </div>
+
+                <div className="table-wrap" style={{ marginTop: 10 }}>
+                  <table>
+                    <tbody>
+                      <tr><th>Bill ID</th><td>{activeExpense.id}</td></tr>
+                      <tr><th>Date</th><td>{activeExpense.expenseDate}</td></tr>
+                      <tr><th>Time</th><td>{formatTime(activeExpense.receivedAt)}</td></tr>
+                      <tr><th>Description</th><td>{activeExpense.description}</td></tr>
+                      <tr><th>Tags</th><td>{activeExpense.tags.length ? activeExpense.tags.map((t) => `#${t}`).join(" ") : "-"}</td></tr>
+                      <tr><th>Wallet</th><td>{activeExpense.wallet ?? "-"}</td></tr>
+                      <tr><th>Amount</th><td>{formatCurrency(activeExpense.amount)}</td></tr>
+                    </tbody>
+                  </table>
+                </div>
+                <div className="toolbar" style={{ marginTop: 12, justifyContent: "flex-end" }}>
                   <button
-                    key={wallet}
+                    className="button secondary"
+                    type="button"
+                    onClick={() => setActiveExpenseId(null)}
+                  >
+                    Close
+                  </button>
+                </div>
+              </section>
+            </div>,
+            document.body
+          ) : null
+      }
+
+      {
+        mounted && quickCategoryExpenseId && quickCategoryAnchor && typeof document !== "undefined"
+          ? createPortal(
+            <div
+              onClick={() => {
+                if (quickCategorySaving) return;
+                setQuickCategoryExpenseId(null);
+                setQuickCategoryAnchor(null);
+              }}
+              style={{ position: "fixed", inset: 0, zIndex: 9999 }}
+            >
+              <section
+                className="card quick-action-card"
+                onClick={(event) => event.stopPropagation()}
+                style={{
+                  position: "fixed",
+                  top: quickCategoryAnchor.top,
+                  left: quickCategoryAnchor.left,
+                  width: 280,
+                  padding: 12,
+                  boxShadow: "var(--shadow-xl)",
+                  border: "1px solid var(--line)"
+                }}
+              >
+                <strong style={{ display: "block", marginBottom: 12, fontSize: '0.875rem', color: 'var(--muted)', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Change Category</strong>
+                <div style={{ display: "grid", gap: 4, maxHeight: 220, overflow: "auto", paddingRight: 4 }}>
+                  {categoryOptions.map((c) => {
+                    const selected = quickCategorySlug === c.slug;
+                    return (
+                      <button
+                        key={c.slug || "uncategorized"}
+                        type="button"
+                        className="button secondary"
+                        disabled={quickCategorySaving}
+                        style={{
+                          justifyContent: "flex-start",
+                          border: 'none',
+                          background: selected ? "var(--primary-light)" : "transparent",
+                          color: selected ? "var(--primary)" : "var(--ink)",
+                          fontWeight: selected ? 600 : 400,
+                          fontSize: '0.875rem',
+                          padding: '8px 12px'
+                        }}
+                        onClick={() => {
+                          setQuickCategorySlug(c.slug);
+                          void saveQuickCategory(c.slug);
+                        }}
+                      >
+                        {quickCategorySaving && selected ? "Saving..." : c.name}
+                      </button>
+                    );
+                  })}
+                </div>
+              </section>
+            </div>,
+            document.body
+          ) : null
+      }
+
+      {
+        mounted && quickWalletExpenseId && quickWalletAnchor && typeof document !== "undefined"
+          ? createPortal(
+            <div
+              onClick={() => {
+                if (quickWalletSaving) return;
+                setQuickWalletExpenseId(null);
+                setQuickWalletAnchor(null);
+              }}
+              style={{ position: "fixed", inset: 0, zIndex: 9999 }}
+            >
+              <section
+                className="card quick-action-card"
+                onClick={(event) => event.stopPropagation()}
+                style={{
+                  position: "fixed",
+                  top: quickWalletAnchor.top,
+                  left: quickWalletAnchor.left,
+                  width: 280,
+                  padding: 12,
+                  boxShadow: "var(--shadow-xl)",
+                  border: "1px solid var(--line)"
+                }}
+              >
+                <strong style={{ display: "block", marginBottom: 12, fontSize: '0.875rem', color: 'var(--muted)', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Source Wallet</strong>
+                <div style={{ display: "grid", gap: 4, maxHeight: 220, overflow: "auto", paddingRight: 4 }}>
+                  <button
                     type="button"
                     className="button secondary"
                     disabled={quickWalletSaving}
                     style={{
                       justifyContent: "flex-start",
-                      borderColor: selected ? "#1d4ed8" : undefined,
-                      color: selected ? "#1d4ed8" : undefined
+                      border: 'none',
+                      background: quickWalletValue === "Cash" ? "var(--primary-light)" : "transparent",
+                      color: quickWalletValue === "Cash" ? "var(--primary)" : "var(--ink)",
+                      fontWeight: quickWalletValue === "Cash" ? 600 : 400,
+                      fontSize: '0.875rem',
+                      padding: '8px 12px'
                     }}
                     onClick={() => {
-                      setQuickWalletValue(wallet);
-                      void saveQuickWallet(wallet);
+                      setQuickWalletValue("Cash");
+                      void saveQuickWallet("Cash");
                     }}
                   >
-                    {quickWalletSaving && selected ? "Saving..." : wallet}
+                    Cash
                   </button>
-                );
-              })}
-            </div>
-          </section>
-        </div>
-      ) : null}
-
-      {quickStatusExpenseId && quickStatusAnchor ? (
-        <div
-          onClick={() => {
-            if (quickStatusSaving) return;
-            setQuickStatusExpenseId(null);
-            setQuickStatusAnchor(null);
-          }}
-          style={{ position: "fixed", inset: 0, zIndex: 95 }}
-        >
-          <section
-            className="card"
-            onClick={(event) => event.stopPropagation()}
-            style={{
-              position: "fixed",
-              top: quickStatusAnchor.top,
-              left: quickStatusAnchor.left,
-              width: 260,
-              padding: 12
-            }}
-          >
-            <strong style={{ display: "block", marginBottom: 8 }}>Quick Status</strong>
-            <div style={{ display: "grid", gap: 6 }}>
-              {statusOptions.map((status) => {
-                const selected = quickStatusValue === status;
-                return (
                   <button
-                    key={status}
                     type="button"
-                    className="text-link-btn"
-                    disabled={quickStatusSaving}
+                    className="button secondary"
+                    disabled={quickWalletSaving}
                     style={{
-                      justifySelf: "start",
-                      border: selected ? "1px solid #1d4ed8" : "1px solid transparent",
-                      borderRadius: 999
+                      justifyContent: "flex-start",
+                      border: 'none',
+                      background: quickWalletValue === "eBank" ? "var(--primary-light)" : "transparent",
+                      color: quickWalletValue === "eBank" ? "var(--primary)" : "var(--ink)",
+                      fontWeight: quickWalletValue === "eBank" ? 600 : 400,
+                      fontSize: '0.875rem',
+                      padding: '8px 12px'
                     }}
                     onClick={() => {
-                      setQuickStatusValue(status);
-                      void saveQuickStatus(status);
+                      setQuickWalletValue("eBank");
+                      void saveQuickWallet("eBank");
                     }}
                   >
-                    <StatusBadge status={status} />
+                    eBank
                   </button>
-                );
-              })}
-            </div>
-          </section>
-        </div>
-      ) : null}
+                  <button
+                    type="button"
+                    className="button secondary"
+                    disabled={quickWalletSaving}
+                    style={{
+                      justifyContent: "flex-start",
+                      border: 'none',
+                      background: !quickWalletValue ? "var(--primary-light)" : "transparent",
+                      color: !quickWalletValue ? "var(--primary)" : "var(--ink)",
+                      fontWeight: !quickWalletValue ? 600 : 400,
+                      fontSize: '0.875rem',
+                      padding: '8px 12px'
+                    }}
+                    onClick={() => {
+                      setQuickWalletValue("");
+                      void saveQuickWallet("");
+                    }}
+                  >
+                    None
+                  </button>
+                </div>
+              </section>
+            </div>,
+            document.body
+          ) : null
+      }
 
-      {descriptionDialogExpenseId ? (
-        <div
-          onClick={() => {
-            if (quickDescriptionSaving) return;
-            setDescriptionDialogExpenseId(null);
-            setDescriptionDialogValue("");
-          }}
-          style={{
-            position: "fixed",
-            inset: 0,
-            background: "rgba(18, 18, 24, 0.52)",
-            zIndex: 98,
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            padding: 16
-          }}
-        >
-          <section
-            className="card"
-            onClick={(event) => event.stopPropagation()}
-            style={{
-              width: "min(420px, 100%)",
-              background: "#f8f8fb",
-              color: "#1f2937",
-              borderColor: "#d9d9e3",
-              borderRadius: 16,
-              padding: 0,
-              overflow: "hidden",
-              boxShadow: "0 22px 48px rgba(17, 24, 39, 0.28)"
-            }}
-          >
-            <div style={{ padding: "24px 22px 8px", textAlign: "center" }}>
-              <div style={{ fontSize: 38, lineHeight: 1, marginBottom: 8 }}>✍️</div>
-              <div style={{ fontSize: 34, fontWeight: 500, marginBottom: 6 }}>Hi again!</div>
-              <div style={{ color: "#4b5563", fontSize: 14 }}>Update expense description</div>
-            </div>
-            <div style={{ padding: "10px 22px 20px" }}>
-              <button
-                type="button"
-                className="button secondary"
-                disabled={quickDescriptionSaving}
-                style={{ width: "100%", justifyContent: "flex-start", marginBottom: 10 }}
-                onClick={(event) => {
-                  event.preventDefault();
-                }}
-              >
-                <input
-                  autoFocus
-                  value={descriptionDialogValue}
-                  onChange={(event) => setDescriptionDialogValue(event.target.value)}
-                  placeholder="Description"
-                  style={{
-                    width: "100%",
-                    border: "0",
-                    outline: "none",
-                    background: "transparent",
-                    color: "#1f2937",
-                    padding: 0
-                  }}
-                  onKeyDown={(event) => {
-                    if (event.key === "Enter" && !quickDescriptionSaving) {
-                      event.preventDefault();
-                      void saveQuickDescription();
-                    }
-                  }}
-                />
-              </button>
-            </div>
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", borderTop: "1px solid #d9d9e3" }}>
-              <button
-                type="button"
-                disabled={quickDescriptionSaving}
-                onClick={() => void saveQuickDescription()}
+      {
+        mounted && quickStatusExpenseId && quickStatusAnchor && typeof document !== "undefined"
+          ? createPortal(
+            <div
+              onClick={() => {
+                if (quickStatusSaving) return;
+                setQuickStatusExpenseId(null);
+                setQuickStatusAnchor(null);
+              }}
+              style={{ position: "fixed", inset: 0, zIndex: 9999 }}
+            >
+              <section
+                className="card quick-action-card"
+                onClick={(event) => event.stopPropagation()}
                 style={{
-                  border: 0,
-                  background: "transparent",
-                  color: "#2563eb",
-                  fontWeight: 700,
-                  padding: "14px 12px",
-                  cursor: quickDescriptionSaving ? "default" : "pointer"
+                  position: "fixed",
+                  top: quickStatusAnchor.top,
+                  left: quickStatusAnchor.left,
+                  width: 180,
+                  padding: 12,
+                  boxShadow: "var(--shadow-xl)",
+                  border: "1px solid var(--line)"
                 }}
               >
-                {quickDescriptionSaving ? "Saving..." : "Ok"}
-              </button>
-              <button
-                type="button"
-                disabled={quickDescriptionSaving}
-                onClick={() => {
-                  setDescriptionDialogExpenseId(null);
-                  setDescriptionDialogValue("");
-                }}
-                style={{
-                  border: 0,
-                  borderLeft: "1px solid #d9d9e3",
-                  background: "transparent",
-                  color: "#2563eb",
-                  padding: "14px 12px",
-                  cursor: quickDescriptionSaving ? "default" : "pointer"
-                }}
-              >
-                Cancel
-              </button>
-            </div>
-          </section>
-        </div>
-      ) : null}
+                <strong style={{ display: "block", marginBottom: 12, fontSize: '0.875rem', color: 'var(--muted)', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Set Status</strong>
+                <div style={{ display: "grid", gap: 4 }}>
+                  {["PENDING_REVIEW", "CONFIRMED", "REJECTED"].map((s) => (
+                    <button
+                      key={s}
+                      type="button"
+                      className="button secondary"
+                      disabled={quickStatusSaving}
+                      style={{
+                        justifyContent: "flex-start",
+                        border: 'none',
+                        background: quickStatusValue === s ? "var(--primary-light)" : "transparent",
+                        color: quickStatusValue === s ? "var(--primary)" : "var(--ink)",
+                        fontWeight: quickStatusValue === s ? 600 : 400,
+                        fontSize: '0.875rem',
+                        padding: '8px 12px'
+                      }}
+                      onClick={() => {
+                        setQuickStatusValue(s);
+                        void saveQuickStatus(s);
+                      }}
+                    >
+                      {s}
+                    </button>
+                  ))}
+                </div>
+              </section>
+            </div>,
+            document.body
+          ) : null
+      }
 
-    </div>
+      {
+        mounted && descriptionDialogExpenseId && typeof document !== "undefined" ? (
+          createPortal(
+            <div
+              role="dialog"
+              aria-modal="true"
+              onClick={() => {
+                if (quickDescriptionSaving) return;
+                setDescriptionDialogExpenseId(null);
+                setDescriptionDialogValue("");
+              }}
+              style={{
+                position: "fixed",
+                inset: 0,
+                background: "rgba(0, 0, 0, 0.35)",
+                zIndex: 9999,
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                padding: 16
+              }}
+            >
+              <section
+                className="card"
+                onClick={(event) => event.stopPropagation()}
+                style={{
+                  width: "min(400px, 100%)",
+                  background: "var(--panel-solid)",
+                  borderRadius: "var(--radius-lg)",
+                  padding: 0,
+                  overflow: "hidden",
+                  boxShadow: "var(--shadow-xl)",
+                  animation: "modalIn 0.2s cubic-bezier(0.16, 1, 0.3, 1)"
+                }}
+              >
+                <div style={{ padding: "24px 24px 8px" }}>
+                  <div style={{ fontSize: '1.25rem', fontWeight: 700, color: 'var(--ink)', marginBottom: 4 }}>Edit Description</div>
+                  <div style={{ color: "var(--muted)", fontSize: '0.875rem' }}>Provide a clear title for this expense.</div>
+                </div>
+                <div style={{ padding: "16px 24px 20px" }}>
+                  <div style={{ border: '1px solid var(--line)', borderRadius: 'var(--radius-md)', padding: '8px 12px', background: 'var(--bg)' }}>
+                    <input
+                      autoFocus
+                      value={descriptionDialogValue}
+                      onChange={(event) => setDescriptionDialogValue(event.target.value)}
+                      placeholder="e.g. Starbucks Coffee"
+                      style={{
+                        width: "100%",
+                        border: "0",
+                        outline: "none",
+                        background: "transparent",
+                        color: "var(--ink)",
+                        fontSize: '0.875rem',
+                        padding: 0
+                      }}
+                      onKeyDown={(event) => {
+                        if (event.key === "Enter" && !quickDescriptionSaving) {
+                          event.preventDefault();
+                          void saveQuickDescription();
+                        }
+                      }}
+                    />
+                  </div>
+                </div>
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", borderTop: "1px solid var(--line)" }}>
+                  <button
+                    type="button"
+                    disabled={quickDescriptionSaving}
+                    onClick={() => {
+                      setDescriptionDialogExpenseId(null);
+                      setDescriptionDialogValue("");
+                    }}
+                    style={{
+                      border: 0,
+                      background: "transparent",
+                      color: "var(--muted)",
+                      fontWeight: 500,
+                      padding: "14px 12px",
+                      fontSize: '0.875rem',
+                      cursor: quickDescriptionSaving ? "default" : "pointer"
+                    }}
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="button"
+                    disabled={quickDescriptionSaving}
+                    onClick={() => void saveQuickDescription()}
+                    style={{
+                      border: 0,
+                      borderLeft: "1px solid var(--line)",
+                      background: "var(--primary)",
+                      color: "#ffffff",
+                      fontWeight: 600,
+                      padding: "14px 12px",
+                      fontSize: '0.875rem',
+                      cursor: quickDescriptionSaving ? "default" : "pointer"
+                    }}
+                  >
+                    {quickDescriptionSaving ? "Saving..." : "Save Changes"}
+                  </button>
+                </div>
+              </section>
+            </div>,
+            document.body
+          )
+        ) : null
+      }
+
+      <ConfirmDialog
+        isOpen={showBulkDeleteConfirm}
+        title="Delete Multiple Expenses"
+        message={`Are you sure you want to delete ${selectedIds.length} selected expenses? This action cannot be reversed.`}
+        confirmLabel="Delete All"
+        isDestructive={true}
+        isLoading={isPending && bulkAction === "delete"}
+        onConfirm={executeBulkDelete}
+        onCancel={() => setShowBulkDeleteConfirm(false)}
+      />
+    </div >
   );
 }

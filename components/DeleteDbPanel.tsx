@@ -3,6 +3,7 @@
 import { useEffect, useState, useTransition } from "react";
 import { ChevronLeftIcon, ChevronRightIcon } from "@heroicons/react/24/outline";
 import { useToast } from "@/components/ToastProvider";
+import { ConfirmDialog } from "@/components/ConfirmDialog";
 
 type AdminUserRow = {
   id: string;
@@ -35,15 +36,24 @@ export function DeleteDbPanel({
     setCurrentPage((prev) => Math.min(prev, totalPages));
   }, [totalPages]);
 
+  const [showConfirm, setShowConfirm] = useState(false);
+  const [selectedUser, setSelectedUser] = useState<AdminUserRow | null>(null);
+
   function deleteForUser(user: AdminUserRow) {
-    if (!window.confirm(`Delete DB contents for ${user.email} (keep account)?`)) return;
+    setSelectedUser(user);
+    setShowConfirm(true);
+  }
+
+  function executeDelete() {
+    if (!selectedUser) return;
+    setShowConfirm(false);
     setError(null);
-    setTargetLabel(user.email);
+    setTargetLabel(selectedUser.email);
     startTransition(async () => {
       const res = await fetch("/api/deletedb", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ userId: user.id })
+        body: JSON.stringify({ userId: selectedUser.id })
       });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) {
@@ -53,7 +63,7 @@ export function DeleteDbPanel({
         return;
       }
       setResult(data.result ?? null);
-      showToast(`Deleted DB data for ${user.email}`, "success");
+      showToast(`Deleted DB data for ${selectedUser?.email}`, "success");
     });
   }
 
@@ -151,9 +161,19 @@ export function DeleteDbPanel({
       {error && <div style={{ color: "#b42318", marginTop: 8 }}>{error}</div>}
       {result && (
         <pre className="card" style={{ marginTop: 12, whiteSpace: "pre-wrap" }}>
-{JSON.stringify(result, null, 2)}
+          {JSON.stringify(result, null, 2)}
         </pre>
       )}
+      <ConfirmDialog
+        isOpen={showConfirm}
+        title="Delete User Database"
+        message={`Are you sure you want to delete all database entries for ${selectedUser?.email}? The account itself will be preserved.`}
+        confirmLabel="Delete Everything"
+        isDestructive={true}
+        isLoading={isPending}
+        onConfirm={executeDelete}
+        onCancel={() => setShowConfirm(false)}
+      />
     </div>
   );
 }
